@@ -4,133 +4,138 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
 
+export const registerUser = async (req: Request, res: Response) => {
+  try {
+    const { name, email, password, isAdmin } = req.body;  
 
-export const registerUser = async (req:Request, res:Response) => {
-    try {
-
-        const { name, email, password, isAdmin } = req.body;
-
-        // Validate required fields
-        if (!name || !email || !password) {
-            return res.status(400).json({ message: "Name, email, and password are required" });
-        }
-
-        const existingUser  =await User.findOne({
-            email: email
-        });
-
-        if (existingUser) {
-            return res.status(400).json({ message: "User with this email already exists" });
-        }
-        // Create new user
-        const newUser = new User({
-          name,
-          email,
-          password, // Password should be hashed in the model pre-save hook
-          isAdmin ,
-         
-        });
-
-        await newUser.save();
-
-        // Respond with the created user (excluding password)
-        const userResponse = {
-            id: newUser._id,
-            name: newUser.name,
-            email: newUser.email,
-           isAdmin: newUser.isAdmin,
-            createdAt: newUser.createdAt,
-            updatedAt: newUser.updatedAt
-        };
-
-        res.status(201).json({message:"User created successfully",userResponse});
-        
-    } catch (error) {
-        console.error("Error registering user:", error);
-        res.status(500).json({ message: "Internal server error" });
+    // Validate required fields
+    if (!name || !email || !password) {
+      return res
+        .status(400)
+        .json({ message: "Name, email, and password are required" });
     }
-}
-
-
-export const loginUser = async (req:Request,res:Response) => {
-    try {
-        const { email, password } = req.body;
-
-        // Validate required fields
-        if (!email || !password) {
-            return res.status(400).json({ message: "Email and password are required" });
-        }
-
-        // Find user by email
-        const user = await User.findOne({ email });
-
-        if (!user) {
-            return res.status(401).json({ message: "Invalid email or password" });
-        }
-
-        // Verify password
-        const passwordMatch = await bcrypt.compare(password, user.password || "");
-
-        if (!passwordMatch) {
-            return res.status(401).json({ message: "Invalid email or password" });
-        }
-                // Save the user to the database
-        const token = jwt.sign(
-        { userId: user._id, email: user.email },
-        process.env.JWT_SECRET!,
-        { expiresIn: '7d' }
-      );
-
-      
-
-        // Respond with user data (excluding password) and token
-        const userResponse = {
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            isAdmin: user.isAdmin,
-            createdAt: user.createdAt,
-            updatedAt: user.updatedAt,
-            token
-        };
-
-        res.status(200).json({ message: "Login successful", user: userResponse });
-        
-    } catch (error) {
-        console.error("Error logging in user:", error);
-        res.status(500).json({ message: "Internal server error" });
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
     }
+
+    const existingUser = await User.findOne({
+      email: email,
+    });
+
+    if (existingUser) {
+      return res
+        .status(400)
+        .json({ message: "User with this email already exists" });
+    }
+    // Create new user
+    const newUser = new User({
+      name,
+      email,
+      password, // Password should be hashed in the model pre-save hook
+      isAdmin,
+    });
+
+    await newUser.save();
+
+    // Respond with the created user (excluding password)
+    const userResponse = {
+      id: newUser._id,
+      name: newUser.name,
+      email: newUser.email,
+      isAdmin: newUser.isAdmin,
+      createdAt: newUser.createdAt,
+      updatedAt: newUser.updatedAt,
+    };
+
+    res
+      .status(201)
+      .json({ message: "User created successfully", userResponse });
+  } catch (error) {
+    console.error("Error registering user:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const loginUser = async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+    console.log(req.body)
+
+    // Validate required fields
+    if (!email || !password) {
+      return res
+        .status(400)
+        .json({ message: "Email and password are required" });
+    }
+
+    // Find user by email
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    // Verify password
+    const passwordMatch = await bcrypt.compare(password, user.password || "");
+
+    if (!passwordMatch) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+    // Save the user to the database
+    const token = jwt.sign(
+      { userId: user._id, email: user.email },
+      process.env.JWT_SECRET!,
+      { expiresIn: "7d" }
+    );
+
+    // Respond with user data (excluding password) and token
+    const userResponse = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      isAdmin: user.isAdmin,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      token,
+    };
+
+    res.status(200).json({ message: "Login successful", user: userResponse });
+  } catch (error) {
+    console.error("Error logging in user:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
 };
 export const getUserProfile = async (req: Request, res: Response) => {
-    try {
-        const userId = req.params.id;
+  try {
+    const userId = req.params.id;
 
-        // Find user by ID
-        const user = await User.findById(userId);
+    // Find user by ID
+    const user = await User.findById(userId);
 
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-
-        // Respond with user data (excluding password)
-        const userResponse = {
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            isAdmin: user.isAdmin,
-            createdAt: user.createdAt,
-            updatedAt: user.updatedAt
-        };
-
-        res.status(200).json({ message: "User profile retrieved successfully", userResponse });
-        
-    } catch (error) {
-        console.error("Error retrieving user profile:", error);
-        res.status(500).json({ message: "Internal server error" });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
-}
 
+    // Respond with user data (excluding password)
+    const userResponse = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      isAdmin: user.isAdmin,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
 
+    res
+      .status(200)
+      .json({ message: "User profile retrieved successfully", userResponse });
+  } catch (error) {
+    console.error("Error retrieving user profile:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
 
 export const forgotPassword = async (req: Request, res: Response) => {
   try {
@@ -140,7 +145,8 @@ export const forgotPassword = async (req: Request, res: Response) => {
     if (!user) return res.status(400).json({ message: "User not found" });
 
     // Generate a reset token (random string)
-    const resetToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
+    const resetToken =
+      Math.random().toString(36).substring(2) + Date.now().toString(36);
 
     // Hash token using bcrypt
     const salt = await bcrypt.genSalt(10);
@@ -164,10 +170,10 @@ export const forgotPassword = async (req: Request, res: Response) => {
       },
     });
 
-  const mailOptions = {
+    const mailOptions = {
       from: process.env.SMTP_MAIL,
       to: email,
-      subject: 'Password Reset Request',
+      subject: "Password Reset Request",
       html: `
         <!DOCTYPE html>
         <html lang="en">
@@ -274,6 +280,3 @@ export const forgotPassword = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
-
-

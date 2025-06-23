@@ -42,3 +42,7 @@ const productSchema = new mongoose.Schema<IProduct>({
 }, {
   timestamps: true,
 });
+
+productSchema.index({location:'2dsphere'})
+
+export const Product = mongoose.model<IProduct>('Product',productSchema)
