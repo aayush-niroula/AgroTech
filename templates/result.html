@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Results</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+        .result { margin: 20px 0; padding: 20px; border-radius: 5px; }
+        .plant { background: #e8f5e9; border-left: 5px solid #4CAF50; }
+        .not-plant { background: #ffebee; border-left: 5px solid #f44336; }
+        .image-preview { max-width: 100%; margin: 10px 0; }
+        .confidence { font-size: 0.9em; color: #666; }
+    </style>
+</head>
+<body>
+    <h1>Analysis Results</h1>
+    
+    <div class="result {% if prediction == 'NOT A PLANT' %}not-plant{% else %}plant{% endif %}">
+        <h2>{{ prediction }}</h2>
+        {% if confidence > 0 %}
+            <div class="confidence">Confidence: {{ confidence }}%</div>
+        {% endif %}
+        {% if message %}
+            <p>{{ message }}</p>
+        {% endif %}
+        
+        {% if image_path %}
+            <img src="{{ url_for('static', filename='uploads/' + image_path.split('/')[-1]) }}" 
+                 class="image-preview" alt="Analyzed image">
+        {% endif %}
+    </div>
+    
+    <a href="{{ url_for('upload_file') }}">Analyze another image</a>
+</body>
+</html>
