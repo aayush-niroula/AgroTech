@@ -37,7 +37,7 @@ export const Navbar = () => {
   const [isDark, setIsDark] = useState<boolean>(
     () => document.documentElement.classList.contains('dark')
   );
-  const user = useSelector((state: RootState) => state.auth.user);
+const user = useSelector((state: RootState) => state.auth.user);
 const dispatch = useDispatch();
 const navigate = useNavigate();
 
@@ -48,9 +48,9 @@ const handleLogout = () => {
 };
 
   const navLinks: NavLink[] = [
-    { href: '#features', label: 'Features' },
+    { href: '/features', label: 'Features' },
     { href: '#how-it-works', label: 'How it Works' },
-    { href: '#marketplace', label: 'Marketplace' },
+    { href: '/marketplace', label: 'Marketplace' },
     { href: '#contact', label: 'Contact' }
   ];
 
