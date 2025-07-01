@@ -1,15 +1,16 @@
 import os
 import cv2
 import numpy as np
-from flask import Flask, request, render_template
+from flask import Flask, request, render_template, send_from_directory, jsonify
 from werkzeug.utils import secure_filename
 import torch
 import torch.nn as nn
 from torchvision import transforms, models
 from PIL import Image
+from flask_cors import CORS
 
 app = Flask(__name__)
-
+CORS(app)
 # Configuration
 UPLOAD_FOLDER = 'static/uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
@@ -118,51 +119,57 @@ def is_plant_image(image):
         print(f"Plant detection error: {e}")
         return False
 
-@app.route('/', methods=['GET', 'POST'])
-def upload_file():
-    if request.method == 'POST':
-        if 'file' not in request.files:
-            return render_template('index.html', error="No file selected")
-            
-        file = request.files['file']
-        if file.filename == '':
-            return render_template('index.html', error="No file selected")
-        
-        if file and allowed_file(file.filename):
-            try:
-                # Save uploaded file
-                filename = secure_filename(file.filename)
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(filepath)
-                
-                # Open and check image
-                img = Image.open(filepath).convert('RGB')
-                
-                if not is_plant_image(img):
-                    return render_template('result.html',
-                                        prediction="NOT A PLANT",
-                                        confidence=0,
-                                        message="The image doesn't contain enough plant-like features",
-                                        image_path=filepath)
-                
-                # Make prediction
-                tensor = transform(img).unsqueeze(0).to(device)
-                with torch.no_grad():
-                    outputs = model(tensor)
-                    probs = torch.nn.functional.softmax(outputs, dim=1)
-                    conf, pred = torch.max(probs, 1)
-                    conf_percent = round(conf.item() * 100, 2)
-                
-                return render_template('result.html',
-                                    prediction=classes[pred.item()],
-                                    confidence=conf_percent,
-                                    image_path=filepath)
-            
-            except Exception as e:
-                return render_template('index.html', 
-                                    error=f"Processing error: {str(e)}")
-    
-    return render_template('index.html')
+@app.route('/predict', methods=['POST'])
+def predict():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+
+    if file and allowed_file(file.filename):
+        try:
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+
+            img = Image.open(filepath).convert('RGB')
+
+            if not is_plant_image(img):
+                return jsonify({
+                    'prediction': 'NOT A PLANT',
+                    'confidence': 0,
+                    'message': 'The image does not contain enough plant-like features',
+                    'image_url': f'/static/uploads/{filename}'
+                })
+
+            tensor = transform(img).unsqueeze(0).to(device)
+            with torch.no_grad():
+                outputs = model(tensor)
+                probs = torch.nn.functional.softmax(outputs, dim=1)
+                conf, pred = torch.max(probs, 1)
+                conf_percent = round(conf.item() * 100, 2)
+
+            return jsonify({
+                'prediction': classes[pred.item()],
+                'confidence': conf_percent,
+                'image_url': f'/static/uploads/{filename}'
+            })
+
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    return jsonify({'error': 'Invalid file type'}), 400
+
+@app.route('/static/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+# Root endpoint
+@app.route('/')
+def index():
+    return jsonify({"message": "Plant Disease Detection API is running"})
 
 if __name__ == '__main__':
     print("\nStarting Flask server...")

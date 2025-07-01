@@ -8,6 +8,8 @@ import { AuthProvider } from "./context/AuthContext.tsx";
 import { persistor, store } from "./app/store.ts";
 import { Provider } from "react-redux";
 import { PersistGate } from "redux-persist/integration/react";
+import 'leaflet/dist/leaflet.css';
+
 
 createRoot(document.getElementById("root")!).render(
   <Provider store={store}>

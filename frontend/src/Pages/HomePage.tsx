@@ -91,7 +91,7 @@ export default function HomePage() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Button size="lg" className="bg-green-600 hover:bg-green-700 text-lg px-8 py-3">
+              <Button onClick={() => navigate('predict-disease')} size="lg" className="bg-green-600 hover:bg-green-700 text-lg px-8 py-3">
                 <Camera className="w-5 h-5 mr-2" />
                 Scan Plant Now
               </Button>

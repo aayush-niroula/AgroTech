@@ -2,8 +2,20 @@ import { useEffect, useState } from "react";
 import { MapPin, Search, ShoppingCart, Badge } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ProductCard } from "@/components/Product-Card";
+
 import { MapView } from "@/components/Map";
+import { ProductCard } from "@/components/Product-Card";
+
+const cities = [
+  { name: "Kathmandu", coordinates: [85.324, 27.7172] },
+  { name: "Pokhara", coordinates: [83.9856, 28.2096] },
+  { name: "Biratnagar", coordinates: [87.2806, 26.4525] },
+  { name: "Birgunj", coordinates: [84.8669, 27.0000] },
+  { name: "Bharatpur", coordinates: [84.4297, 27.6761] },
+  { name: "Butwal", coordinates: [83.4509, 27.7000] },
+  { name: "Dhangadhi", coordinates: [80.5937, 28.6981] },
+  { name: "Nepalgunj", coordinates: [81.6250, 28.0500] },
+];
 
 export interface IProduct {
   _id: string;
@@ -226,6 +238,9 @@ export default function MarketplacePage() {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(
     null
   );
+  const [selectedCity, setSelectedCity] = useState<string | null>(null);
+const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
+
 
   // ✅ Get User Location on Mount
   useEffect(() => {
@@ -244,46 +259,47 @@ export default function MarketplacePage() {
       setUserLocation(null);
     }
   }, []);
+  console.log("Userlocation",userLocation);
+  
 
   // ✅ Unique Categories
   const categories = Array.from(new Set(products.map((p) => p.category)));
 
   // ✅ Apply Search, Category & Location Filter
   useEffect(() => {
-    let filtered = products;
+  let filtered = products;
 
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (product) =>
-          product.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          product.description
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase()) ||
-          product.brand.toLowerCase().includes(searchTerm.toLowerCase())
+  // Search filter
+  if (searchTerm) {
+    filtered = filtered.filter(
+      (product) =>
+        product.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.brand.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }
+
+  // Category filter
+  if (selectedCategory) {
+    filtered = filtered.filter((product) => product.category === selectedCategory);
+  }
+
+  // Location filter only if user selected a city
+  if (userLocation) {
+    filtered = filtered.filter((product) => {
+      const [lon, lat] = product.location.coordinates;
+      const distance = getDistanceFromLatLonInKm(
+        userLocation[1],
+        userLocation[0],
+        lat,
+        lon
       );
-    }
+      return distance <= radius;
+    });
+  }
 
-    if (selectedCategory) {
-      filtered = filtered.filter(
-        (product) => product.category === selectedCategory
-      );
-    }
-
-    if (userLocation) {
-      filtered = filtered.filter((product) => {
-        const [lon, lat] = product.location.coordinates;
-        const distance = getDistanceFromLatLonInKm(
-          userLocation[1],
-          userLocation[0],
-          lat,
-          lon
-        );
-        return distance <= radius;
-      });
-    }
-
-    setFilteredProducts(filtered);
-  }, [searchTerm, selectedCategory, products, userLocation, radius]);
+  setFilteredProducts(filtered);
+}, [searchTerm, selectedCategory, products, userLocation, radius]);
 
   // ✅ Handlers
   const handleAddToCart = (productId: string) => {
@@ -313,6 +329,36 @@ export default function MarketplacePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 🔥 Header */}
+      <div className="flex items-center gap-2">
+  <label className="text-sm text-gray-600">Location:</label>
+<select
+  value={selectedCity || ""}
+  onChange={(e) => {
+    const value = e.target.value;
+    if (value === "") {
+      setSelectedCity(null);
+      setUserLocation(null);
+      setMapCenter(null); // Reset Map
+    } else {
+      const city = cities.find((c) => c.name === value);
+      setSelectedCity(value);
+      if (city) {
+        setUserLocation(city.coordinates as [number, number]);
+        setMapCenter(city.coordinates as [number, number]); // Pan Map to City
+      }
+    }
+  }}
+  className="border rounded px-2 py-1 text-sm"
+>
+  <option value="">All Nepal</option>
+  {cities.map((city) => (
+    <option key={city.name} value={city.name}>
+      {city.name}
+    </option>
+  ))}
+</select>
+
+</div>
       <div className="bg-white border-b sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -373,7 +419,7 @@ export default function MarketplacePage() {
               </Button>
             ))}
           </div>
-
+     
           {/* ✅ Radius Selector */}
           {userLocation && (
             <div className="flex items-center gap-2">
@@ -404,22 +450,27 @@ export default function MarketplacePage() {
           userLocation={userLocation}
           products={filteredProducts}
           radius={radius}
+          center={mapCenter}
         />
 
         {/* 🌟 Products Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredProducts.map((product) => (
-            <ProductCard
-              key={product._id}
-              product={product}
-              onAddToCart={handleAddToCart}
-              onToggleFavorite={handleToggleFavorite}
-              onChat={handleChat}
-              onCall={handleCall}
-              onViewDetails={handleViewDetails}
-              isFavorited={favoritedProducts.includes(product._id)}
-            />
-          ))}
+          {filteredProducts.length > 0 ? (
+            filteredProducts.map((product) => (
+              <ProductCard
+                key={product._id}
+                product={product}
+                onAddToCart={handleAddToCart}
+                onToggleFavorite={handleToggleFavorite}
+                onChat={handleChat}
+                onCall={handleCall}
+                onViewDetails={handleViewDetails}
+                isFavorited={favoritedProducts.includes(product._id)}
+              />
+            ))
+          ) : (
+            <p className="text-gray-500">No products found.</p>
+          )}
         </div>
       </div>
     </div>

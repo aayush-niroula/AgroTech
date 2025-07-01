@@ -9,6 +9,7 @@ import AppLayout from './AppLayout'
 import MarketplacePage from './Pages/MarkerPlace'
 import HomePage from './Pages/HomePage'
 import FeaturesPage from './Pages/FeaturePage'
+import PlantDiseaseDetection from './Pages/PlantDiseaseDetection'
 
 
 const App = () => {
@@ -19,6 +20,7 @@ const App = () => {
         <Route index element={<HomePage />} />
         <Route  path='/features' element={<FeaturesPage/>}/>
         <Route path="marketplace" element={<MarketplacePage />} />
+        <Route path='/predict-disease' element={<PlantDiseaseDetection/>}/>
       </Route>
 
       {/* Auth Pages (no Navbar) */}
