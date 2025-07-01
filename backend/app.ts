@@ -12,7 +12,12 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware to parse JSON bodies
 app.use(express.json());
-app.use(cors({}))
+app.use(
+  cors({
+    origin: "http://localhost:5173",  
+    credentials: true,                 
+  })
+);
 app.use('/api/users',userRoutes);
 app.use('/api/products',productRoutes)
 

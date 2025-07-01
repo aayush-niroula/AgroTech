@@ -91,17 +91,19 @@ export const loginUser = async (req: Request, res: Response) => {
     );
 
     // Respond with user data (excluding password) and token
-    const userResponse = {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      isAdmin: user.isAdmin,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-      token,
-    };
+  
 
-    res.status(200).json({ message: "Login successful", user: userResponse });
+  res.status(200).json({
+  token,
+  user: {
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    isAdmin: user.isAdmin,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  },
+});
   } catch (error) {
     console.error("Error logging in user:", error);
     res.status(500).json({ message: "Internal server error" });
