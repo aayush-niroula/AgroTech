@@ -17,6 +17,7 @@ import { useLoginMutation } from "@/services/authApi";
 import { useDispatch } from "react-redux";
 import { setCredentials } from "@/app/slices/authSlice";
 
+
 const Login: React.FC = () => {
   const [formData, setFormData] = useState({
     email: "",
@@ -37,7 +38,19 @@ const Login: React.FC = () => {
 
     try {
       const response = await loginUser(formData).unwrap();
-      dispatch(setCredentials(response));
+      console.log(response);
+      
+      dispatch(
+        setCredentials({
+          user: {
+            id: response.user.id,
+            name: response.user.name,
+            email: response.user.email,
+           
+          },
+          token: response.token,
+        })
+      );
       setSuccess("Login successful! Redirecting...");
       navigate("/");
     } catch (err: any) {

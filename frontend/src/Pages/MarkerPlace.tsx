@@ -448,7 +448,10 @@ const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
         </div>
         <MapView
           userLocation={userLocation}
-          products={filteredProducts}
+          products={filteredProducts.map(product => ({
+            ...product,
+            imageUrl: product.imageUrls[0],
+          }))}
           radius={radius}
           center={mapCenter}
         />
@@ -458,14 +461,14 @@ const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
           {filteredProducts.length > 0 ? (
             filteredProducts.map((product) => (
               <ProductCard
-                key={product._id}
-                product={product}
-                onAddToCart={handleAddToCart}
-                onToggleFavorite={handleToggleFavorite}
-                onChat={handleChat}
-                onCall={handleCall}
-                onViewDetails={handleViewDetails}
-                isFavorited={favoritedProducts.includes(product._id)}
+          key={product._id}
+          product={{ ...product, imageUrl: product.imageUrls[0] }}
+          onAddToCart={handleAddToCart}
+          onToggleFavorite={handleToggleFavorite}
+          onChat={handleChat}
+          onCall={handleCall}
+          onViewDetails={handleViewDetails}
+          isFavorited={favoritedProducts.includes(product._id)}
               />
             ))
           ) : (

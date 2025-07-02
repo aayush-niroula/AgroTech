@@ -10,6 +10,7 @@ import MarketplacePage from './Pages/MarkerPlace'
 import HomePage from './Pages/HomePage'
 import FeaturesPage from './Pages/FeaturePage'
 import PlantDiseaseDetection from './Pages/PlantDiseaseDetection'
+import AddProductForm from './components/AddProductForm'
 
 
 const App = () => {
@@ -21,6 +22,7 @@ const App = () => {
         <Route  path='/features' element={<FeaturesPage/>}/>
         <Route path="marketplace" element={<MarketplacePage />} />
         <Route path='/predict-disease' element={<PlantDiseaseDetection/>}/>
+        <Route path='/createproduct' element={<AddProductForm/>}/>
       </Route>
 
       {/* Auth Pages (no Navbar) */}

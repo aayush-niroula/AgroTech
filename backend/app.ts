@@ -20,7 +20,7 @@ app.use(
 );
 app.use('/api/users',userRoutes);
 app.use('/api/products',productRoutes)
-
+app.use('/uploads',express.static('uploads'))
 dbConnection();
 // Start the server
 

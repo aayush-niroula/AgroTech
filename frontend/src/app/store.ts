@@ -13,10 +13,13 @@ import {
   REGISTER,
 } from 'redux-persist';
 import storage from 'redux-persist/lib/storage';
+import { plantApi } from '@/services/plantApi';
 
 const rootReducer = combineReducers({
   [api.reducerPath]: api.reducer,
+  [plantApi.reducerPath]:plantApi.reducer,
   auth: authReducer,
+
 });
 
 
@@ -36,7 +39,7 @@ export const store = configureStore({
       serializableCheck: {
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
-    }).concat(api.middleware),
+    }).concat(api.middleware as any, plantApi.middleware as any),
 });
 
 

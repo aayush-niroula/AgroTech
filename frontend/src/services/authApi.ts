@@ -6,12 +6,15 @@ interface LoginRequest {
   password: string;
 }
 
-interface LoginResponse {
+export interface LoginResponse {
   token: string;
   user: {
+    id: string;
     name: string;
     email: string;
-    avatar?: string;
+    isAdmin: boolean;
+    createdAt: string;
+    updatedAt: string;
   };
 }
 

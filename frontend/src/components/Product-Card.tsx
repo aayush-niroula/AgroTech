@@ -8,8 +8,6 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { MapPin, MessageCircle, Phone, Star, ShoppingCart, Heart, Package, Scale, CheckCircle, Eye } from "lucide-react"
 import type { IProduct } from "../types/product"
-// Remove the next/image import and use regular img element
-// You'll also need to modify the Image component usage in the code to use img instead
 
 interface ProductCardProps {
   product: IProduct
@@ -66,32 +64,15 @@ export function ProductCard({
       <Card className="group hover:shadow-xl transition-all duration-300 border-0 shadow-md overflow-hidden bg-white">
         {/* Image Section */}
         <div className="relative aspect-[4/3] overflow-hidden bg-gray-100">
-          {product.imageUrls.length > 0 && (
-            <>
-              <img
-                src={product.imageUrls[currentImageIndex] || "/placeholder.svg?height=300&width=400"}
-                alt={product.title}
-                className={`object-cover transition-all duration-300 group-hover:scale-105 ${
-                  isImageLoading ? "blur-sm" : "blur-0"
-                }`}
-                onLoad={() => setIsImageLoading(false)}
-              />
-
-              {/* Image Navigation Dots */}
-              {product.imageUrls.length > 1 && (
-                <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex space-x-1">
-                  {product.imageUrls.map((_, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setCurrentImageIndex(index)}
-                      className={`w-2 h-2 rounded-full transition-all ${
-                        index === currentImageIndex ? "bg-white" : "bg-white/50"
-                      }`}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
+          {product.imageUrl.length > 0 && (
+            <img
+              src={product.imageUrl[0] || "/placeholder.svg?height=300&width=400"}
+              alt={product.title}
+              className={`object-cover transition-all duration-300 group-hover:scale-105 ${
+                isImageLoading ? "blur-sm" : "blur-0"
+              }`}
+              onLoad={() => setIsImageLoading(false)}
+            />
           )}
 
           {/* Favorite Button */}

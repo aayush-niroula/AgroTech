@@ -5,7 +5,7 @@ export interface IProduct{
     price:number
     category:string
     brand:string
-    imageUrls:string[]
+    imageUrl:string
     quantity:number
     location:{
         type:"Point"
