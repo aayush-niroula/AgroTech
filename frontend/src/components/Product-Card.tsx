@@ -1,23 +1,30 @@
-"use client"
-
-import { useState } from "react"
-import { motion } from "framer-motion"
-import { Card, CardContent, CardFooter } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { MapPin, MessageCircle, Phone, Star, ShoppingCart, Heart, Package, Scale, CheckCircle, Eye } from "lucide-react"
-import type { IProduct } from "../types/product"
+import { useState } from "react";
+import { motion } from "framer-motion";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  MapPin,
+  MessageCircle,
+  Phone,
+  ShoppingCart,
+  Heart,
+  Package,
+  Scale,
+  Eye,
+} from "lucide-react";
+import type { IProduct, Seller } from "../types/product";
 
 interface ProductCardProps {
-  product: IProduct
-  onAddToCart?: (productId: string) => void
-  onToggleFavorite?: (productId: string) => void
-  onChat?: (sellerId: string) => void
-  onCall?: (sellerId: string) => void
-  onViewDetails?: (productId: string) => void
-  isFavorited?: boolean
-  className?: string
+  product: IProduct & { sellerId: Seller | string }; // support string or Seller object
+  onAddToCart?: (productId: string) => void;
+  onToggleFavorite?: (productId: string) => void;
+  onChat?: (sellerId: string) => void;
+  onCall?: (sellerId: string) => void;
+  onViewDetails?: (productId: string) => void;
+  isFavorited?: boolean;
+  className?: string;
 }
 
 export function ProductCard({
@@ -30,29 +37,40 @@ export function ProductCard({
   isFavorited = false,
   className = "",
 }: ProductCardProps) {
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [isImageLoading, setIsImageLoading] = useState(true)
+  const [isImageLoading, setIsImageLoading] = useState(true);
 
-  // Calculate distance (mock function - you'd implement actual geolocation)
+  // Helper to get seller name safely
+  const getSellerName = (): string => {
+    if (typeof product.sellerId === "object" && product.sellerId.name) {
+      return product.sellerId.name;
+    }
+    return "Unknown Seller";
+  };
+
+  // Helper to get seller id string safely
+  const getSellerId = (): string => {
+    if (typeof product.sellerId === "string") return product.sellerId;
+    if (typeof product.sellerId === "object") return product.sellerId._id;
+    return "";
+  };
+
+  // Mock distance calculation
   const getDistance = (coordinates: [number, number]) => {
-    // Mock distance calculation
-    return `${Math.floor(Math.random() * 50 + 1)} km away`
-  }
+    return `${Math.floor(Math.random() * 50 + 1)} km away`;
+  };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("en-US", {
+  const formatPrice = (price: number) =>
+    new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "NPR",
-    }).format(price)
-  }
+    }).format(price);
 
-  const getSellerInitials = (name: string) => {
-    return name
+  const getSellerInitials = (name: string) =>
+    name
       .split(" ")
       .map((n) => n[0])
       .join("")
-      .toUpperCase()
-  }
+      .toUpperCase();
 
   return (
     <motion.div
@@ -66,7 +84,7 @@ export function ProductCard({
         <div className="relative aspect-[4/3] overflow-hidden bg-gray-100">
           {product.imageUrl.length > 0 && (
             <img
-              src={product.imageUrl[0] || "/placeholder.svg?height=300&width=400"}
+              src={product.imageUrl || "/placeholder.svg?height=300&width=400"}
               alt={product.title}
               className={`object-cover transition-all duration-300 group-hover:scale-105 ${
                 isImageLoading ? "blur-sm" : "blur-0"
@@ -81,7 +99,9 @@ export function ProductCard({
             className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:bg-white transition-colors"
           >
             <Heart
-              className={`w-4 h-4 transition-colors ${isFavorited ? "fill-red-500 text-red-500" : "text-gray-600"}`}
+              className={`w-4 h-4 transition-colors ${
+                isFavorited ? "fill-red-500 text-red-500" : "text-gray-600"
+              }`}
             />
           </button>
 
@@ -132,22 +152,13 @@ export function ProductCard({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Avatar className="w-8 h-8">
-                <AvatarImage src={product.sellerId.avatar || "/placeholder.svg"} />
+                {/* No avatar URL available */}
                 <AvatarFallback className="text-xs bg-green-100 text-green-700">
-                  {getSellerInitials(product.sellerId.name)}
+                  {getSellerInitials(getSellerName())}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <div className="flex items-center gap-1">
-                  <span className="text-sm font-medium text-gray-900">{product.sellerId.name}</span>
-                  {product.sellerId.isVerified && <CheckCircle className="w-3 h-3 text-green-600" />}
-                </div>
-                {product.sellerId.rating && (
-                  <div className="flex items-center gap-1">
-                    <Star className="w-3 h-3 text-yellow-400 fill-current" />
-                    <span className="text-xs text-gray-500">{product.sellerId.rating.toFixed(1)}</span>
-                  </div>
-                )}
+                <span className="text-sm font-medium text-gray-900">{getSellerName()}</span>
               </div>
             </div>
           </div>
@@ -177,11 +188,11 @@ export function ProductCard({
 
           {/* Contact Buttons */}
           <div className="flex gap-2 w-full">
-            <Button onClick={() => onChat?.(product.sellerId._id)} variant="outline" size="sm" className="flex-1">
+            <Button onClick={() => onChat?.(getSellerId())} variant="outline" size="sm" className="flex-1">
               <MessageCircle className="w-4 h-4 mr-2" />
               Chat
             </Button>
-            <Button onClick={() => onCall?.(product.sellerId._id)} variant="outline" size="sm" className="flex-1">
+            <Button onClick={() => onCall?.(getSellerId())} variant="outline" size="sm" className="flex-1">
               <Phone className="w-4 h-4 mr-2" />
               Call
             </Button>
@@ -189,5 +200,5 @@ export function ProductCard({
         </CardFooter>
       </Card>
     </motion.div>
-  )
+  );
 }

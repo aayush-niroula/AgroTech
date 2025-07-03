@@ -1,364 +1,97 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MapPin, Search, ShoppingCart, Badge } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-
 import { MapView } from "@/components/Map";
 import { ProductCard } from "@/components/Product-Card";
+import { useGetProductsQuery } from "@/services/productApi";
+import type { IProduct, ApiResponse } from '@/types/product';
 
 const cities = [
   { name: "Kathmandu", coordinates: [85.324, 27.7172] },
   { name: "Pokhara", coordinates: [83.9856, 28.2096] },
   { name: "Biratnagar", coordinates: [87.2806, 26.4525] },
-  { name: "Birgunj", coordinates: [84.8669, 27.0000] },
+  { name: "Birgunj", coordinates: [84.8669, 27.0] },
   { name: "Bharatpur", coordinates: [84.4297, 27.6761] },
-  { name: "Butwal", coordinates: [83.4509, 27.7000] },
+  { name: "Butwal", coordinates: [83.4509, 27.7] },
   { name: "Dhangadhi", coordinates: [80.5937, 28.6981] },
-  { name: "Nepalgunj", coordinates: [81.6250, 28.0500] },
+  { name: "Nepalgunj", coordinates: [81.625, 28.05] },
 ];
-
-export interface IProduct {
-  _id: string;
-  title: string;
-  description: string;
-  price: number;
-  category: string;
-  brand: string;
-  imageUrls: string[];
-  quantity: number;
-  location: {
-    type: "Point";
-    coordinates: [number, number]; // [longitude, latitude]
-  };
-  weight: number;
-  sellerId: {
-    _id: string;
-    name: string;
-    avatar: string;
-    rating: number;
-    isVerified: boolean;
-  };
-  createdAt: string;
-  updatedAt: string;
-}
-
-// Mock products
-
-export const mockProducts: IProduct[] = [
-  {
-    _id: "1",
-    title: "Organic Tomatoes - Premium Quality",
-    description:
-      "Fresh, organic tomatoes grown without pesticides. Perfect for salads, cooking, and canning.",
-    price: 4.99,
-    category: "Vegetables",
-    brand: "Green Valley Farms",
-    imageUrls: [
-      "https://images.unsplash.com/photo-1582281298052-458f4e7d1e91?w=400&h=300&fit=crop",
-    ],
-    quantity: 50,
-    location: {
-      type: "Point",
-      coordinates: [85.324, 27.7172], // Kathmandu
-    },
-    weight: 1.5,
-    sellerId: {
-      _id: "seller1",
-      name: "Aayush Gurung",
-      avatar: "https://randomuser.me/api/portraits/men/32.jpg",
-      rating: 4.8,
-      isVerified: true,
-    },
-    createdAt: "2024-01-15T10:00:00Z",
-    updatedAt: "2024-01-15T10:00:00Z",
-  },
-  {
-    _id: "2",
-    title: "Fresh Corn - Sweet & Crispy",
-    description: "Locally grown sweet corn, perfect for grilling or boiling.",
-    price: 3.5,
-    category: "Vegetables",
-    brand: "Sunny Acres",
-    imageUrls: [
-      "https://images.unsplash.com/photo-1551754655-cd27e38d2076?w=400&h=300&fit=crop",
-    ],
-    quantity: 20,
-    location: {
-      type: "Point",
-      coordinates: [85.324, 27.6872], // Nearby Kathmandu
-    },
-    weight: 2.0,
-    sellerId: {
-      _id: "seller2",
-      name: "Pratibha Jha",
-      avatar: "https://randomuser.me/api/portraits/women/44.jpg",
-      rating: 4.9,
-      isVerified: true,
-    },
-    createdAt: "2024-01-14T15:30:00Z",
-    updatedAt: "2024-01-14T15:30:00Z",
-  },
-  {
-    _id: "3",
-    title: "Premium Wheat Flour",
-    description:
-      "Stone-ground whole wheat flour. Perfect for bread and baking.",
-    price: 12.99,
-    category: "Grains",
-    brand: "Heritage Mills",
-    imageUrls: [
-      "https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=400&h=300&fit=crop",
-    ],
-    quantity: 25,
-    location: {
-      type: "Point",
-      coordinates: [85.324, 27.7072], // Kathmandu
-    },
-    weight: 5.0,
-    sellerId: {
-      _id: "seller3",
-      name: "Saurav Roy",
-      avatar: "https://randomuser.me/api/portraits/men/54.jpg",
-      rating: 4.7,
-      isVerified: false,
-    },
-    createdAt: "2024-01-13T09:15:00Z",
-    updatedAt: "2024-01-13T09:15:00Z",
-  },
-  {
-    _id: "4",
-    title: "Honeycrisp Apples",
-    description:
-      "Sweet and crisp Honeycrisp apples, freshly picked from the orchard.",
-    price: 6.99,
-    category: "Fruits",
-    brand: "Orchard Fresh",
-    imageUrls: [
-      "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=400&h=300&fit=crop",
-    ],
-    quantity: 30,
-    location: {
-      type: "Point",
-      coordinates: [85.314, 27.7272], // Near Kathmandu
-    },
-    weight: 3.0,
-    sellerId: {
-      _id: "seller4",
-      name: "Emily Davis",
-      avatar: "https://randomuser.me/api/portraits/women/68.jpg",
-      rating: 4.6,
-      isVerified: true,
-    },
-    createdAt: "2024-01-12T14:20:00Z",
-    updatedAt: "2024-01-12T14:20:00Z",
-  },
-  {
-    _id: "5",
-    title: "Organic Carrots",
-    description: "Fresh organic carrots rich in vitamins and minerals.",
-    price: 2.99,
-    category: "Vegetables",
-    brand: "Nature's Best",
-    imageUrls: [
-      "https://images.unsplash.com/photo-1445282768818-728615cc910a?w=400&h=300&fit=crop",
-    ],
-    quantity: 15,
-    location: {
-      type: "Point",
-      coordinates: [85.334, 27.7472], // Nearby
-    },
-    weight: 1.0,
-    sellerId: {
-      _id: "seller5",
-      name: "Michael Brown",
-      avatar: "https://randomuser.me/api/portraits/men/65.jpg",
-      rating: 4.5,
-      isVerified: true,
-    },
-    createdAt: "2024-01-11T11:45:00Z",
-    updatedAt: "2024-01-11T11:45:00Z",
-  },
-  {
-    _id: "6",
-    title: "Fresh Milk - Whole",
-    description: "Farm-fresh whole milk from grass-fed cows. Rich and creamy.",
-    price: 4.5,
-    category: "Dairy",
-    brand: "Meadow Farm",
-    imageUrls: [
-      "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&h=300&fit=crop",
-    ],
-    quantity: 20,
-    location: {
-      type: "Point",
-      coordinates: [85.354, 27.7672], // Slightly further
-    },
-    weight: 1.0,
-    sellerId: {
-      _id: "seller6",
-      name: "Sarah Wilson",
-      avatar: "https://randomuser.me/api/portraits/women/55.jpg",
-      rating: 4.9,
-      isVerified: true,
-    },
-    createdAt: "2024-01-10T08:30:00Z",
-    updatedAt: "2024-01-10T08:30:00Z",
-  },
-];
-
-// 🚩 Haversine Formula to Calculate Distance
-function getDistanceFromLatLonInKm(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number {
-  const R = 6371; // Earth's radius in km
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
 
 export default function MarketplacePage() {
-  const [products] = useState<IProduct[]>(mockProducts);
-  const [filteredProducts, setFilteredProducts] =
-    useState<IProduct[]>(mockProducts);
-  const [favoritedProducts, setFavoritedProducts] = useState<string[]>([]);
-  const [cartItems, setCartItems] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [radius, setRadius] = useState<number>(50);
-  const [userLocation, setUserLocation] = useState<[number, number] | null>(
-    null
-  );
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
-const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
+  const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
+  const [favoritedProducts, setFavoritedProducts] = useState<string[]>([]);
+  const [cartItems, setCartItems] = useState<string[]>([]);
 
-
-  // ✅ Get User Location on Mount
+  // Get user geolocation on mount
   useEffect(() => {
-    if ("geolocation" in navigator) {
+    if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           setUserLocation([pos.coords.longitude, pos.coords.latitude]);
         },
-        (err) => {
-          console.error("Geolocation error:", err);
-          setUserLocation(null); // fallback if permission denied
+        () => {
+          setUserLocation(null);
         }
       );
-    } else {
-      console.error("Geolocation not available");
-      setUserLocation(null);
     }
   }, []);
-  console.log("Userlocation",userLocation);
+
+  // API Call
+  const {
+    data,
+    isLoading,
+    isError,
+  } = useGetProductsQuery({
+    category: selectedCategory || undefined,
+    coordinates: userLocation ? `${userLocation[0]},${userLocation[1]}` : undefined,
+    maxDistance: userLocation ? radius * 1000 : undefined,
+  });
+  console.log(data);
   
+const productList:IProduct[]=data?.data ?? [];
+  // Categories
+const categories = useMemo(() => Array.from(new Set(productList.map((p) => p.category))), [productList]);
 
-  // ✅ Unique Categories
-  const categories = Array.from(new Set(products.map((p) => p.category)));
+// ✅ Filtering Logic
+const filteredProducts = useMemo(() => {
+  let filtered = productList;
 
-  // ✅ Apply Search, Category & Location Filter
-  useEffect(() => {
-  let filtered = products;
-
-  // Search filter
   if (searchTerm) {
-    filtered = filtered.filter(
-      (product) =>
-        product.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.brand.toLowerCase().includes(searchTerm.toLowerCase())
+    filtered = filtered.filter((product) =>
+      [product.title, product.description, product.brand].some((field) =>
+        field.toLowerCase().includes(searchTerm.toLowerCase())
+      )
     );
   }
 
-  // Category filter
   if (selectedCategory) {
-    filtered = filtered.filter((product) => product.category === selectedCategory);
+    filtered = filtered.filter((p) => p.category === selectedCategory);
   }
 
-  // Location filter only if user selected a city
-  if (userLocation) {
-    filtered = filtered.filter((product) => {
-      const [lon, lat] = product.location.coordinates;
-      const distance = getDistanceFromLatLonInKm(
-        userLocation[1],
-        userLocation[0],
-        lat,
-        lon
-      );
-      return distance <= radius;
-    });
-  }
-
-  setFilteredProducts(filtered);
-}, [searchTerm, selectedCategory, products, userLocation, radius]);
-
-  // ✅ Handlers
-  const handleAddToCart = (productId: string) => {
-    setCartItems((prev) => [...prev, productId]);
-  };
+  return filtered;
+}, [productList, searchTerm, selectedCategory]);
+  // Handlers
+  const handleAddToCart = (productId: string) => setCartItems((prev) => [...prev, productId]);
 
   const handleToggleFavorite = (productId: string) => {
     setFavoritedProducts((prev) =>
-      prev.includes(productId)
-        ? prev.filter((id) => id !== productId)
-        : [...prev, productId]
+      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]
     );
   };
 
-  const handleChat = (sellerId: string) => {
-    alert(`Starting chat with seller: ${sellerId}`);
-  };
-
-  const handleCall = (sellerId: string) => {
-    alert(`Calling seller: ${sellerId}`);
-  };
-
-  const handleViewDetails = (productId: string) => {
-    alert(`Viewing details for product: ${productId}`);
-  };
+  const handleChat = (sellerId: string) => alert(`Starting chat with seller: ${sellerId}`);
+  const handleCall = (sellerId: string) => alert(`Calling seller: ${sellerId}`);
+  const handleViewDetails = (productId: string) => alert(`Viewing details for product: ${productId}`);
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 🔥 Header */}
-      <div className="flex items-center gap-2">
-  <label className="text-sm text-gray-600">Location:</label>
-<select
-  value={selectedCity || ""}
-  onChange={(e) => {
-    const value = e.target.value;
-    if (value === "") {
-      setSelectedCity(null);
-      setUserLocation(null);
-      setMapCenter(null); // Reset Map
-    } else {
-      const city = cities.find((c) => c.name === value);
-      setSelectedCity(value);
-      if (city) {
-        setUserLocation(city.coordinates as [number, number]);
-        setMapCenter(city.coordinates as [number, number]); // Pan Map to City
-      }
-    }
-  }}
-  className="border rounded px-2 py-1 text-sm"
->
-  <option value="">All Nepal</option>
-  {cities.map((city) => (
-    <option key={city.name} value={city.name}>
-      {city.name}
-    </option>
-  ))}
-</select>
-
-</div>
+      {/* Header */}
       <div className="bg-white border-b sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -385,21 +118,62 @@ const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
         </div>
       </div>
 
-      {/* 🔍 Filters */}
+      {/* Filters */}
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8 space-y-4">
-          {/* Search */}
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              placeholder="Search products..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
+                placeholder="Search products..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            <select
+              value={selectedCity || ""}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (!value) {
+                  setSelectedCity(null);
+                  setUserLocation(null);
+                  setMapCenter(null);
+                } else {
+                  const city = cities.find((c) => c.name === value);
+                  if (city) {
+                    setSelectedCity(value);
+                    setUserLocation(city.coordinates as [number, number]);
+                    setMapCenter(city.coordinates as [number, number]);
+                  }
+                }
+              }}
+              className="border rounded px-2 py-1 text-sm"
+            >
+              <option value="">All Nepal</option>
+              {cities.map((city) => (
+                <option key={city.name} value={city.name}>
+                  {city.name}
+                </option>
+              ))}
+            </select>
+
+            {userLocation && (
+              <select
+                value={radius}
+                onChange={(e) => setRadius(Number(e.target.value))}
+                className="border rounded px-2 py-1 text-sm"
+              >
+                {[5, 10, 20, 50, 100].map((km) => (
+                  <option key={km} value={km}>
+                    {km} km
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
-          {/* Categories */}
           <div className="flex flex-wrap gap-2">
             <Button
               variant={selectedCategory === null ? "default" : "outline"}
@@ -419,56 +193,34 @@ const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
               </Button>
             ))}
           </div>
-     
-          {/* ✅ Radius Selector */}
-          {userLocation && (
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600">Radius:</label>
-              <select
-                value={radius}
-                onChange={(e) => setRadius(Number(e.target.value))}
-                className="border rounded px-2 py-1 text-sm"
-              >
-                <option value={5}>5 km</option>
-                <option value={10}>10 km</option>
-                <option value={20}>20 km</option>
-                <option value={50}>50 km</option>
-                <option value={100}>100 km</option>
-              </select>
-            </div>
-          )}
 
-          {/* Info */}
           <div className="text-sm text-gray-600">
-            Showing {filteredProducts.length} of {products.length} products
+            Showing {filteredProducts.length} of {productList.length} products
             {selectedCategory && ` in ${selectedCategory}`}
             {searchTerm && ` for "${searchTerm}"`}
             {userLocation && ` within ${radius} km`}
           </div>
         </div>
+
         <MapView
           userLocation={userLocation}
-          products={filteredProducts.map(product => ({
-            ...product,
-            imageUrl: product.imageUrls[0],
-          }))}
+          products={filteredProducts.map((p) => ({ ...p, imageUrl: p.imageUrl }))}
           radius={radius}
           center={mapCenter}
         />
 
-        {/* 🌟 Products Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mt-6">
           {filteredProducts.length > 0 ? (
             filteredProducts.map((product) => (
               <ProductCard
-          key={product._id}
-          product={{ ...product, imageUrl: product.imageUrls[0] }}
-          onAddToCart={handleAddToCart}
-          onToggleFavorite={handleToggleFavorite}
-          onChat={handleChat}
-          onCall={handleCall}
-          onViewDetails={handleViewDetails}
-          isFavorited={favoritedProducts.includes(product._id)}
+                key={product._id}
+                product={{ ...product, imageUrl: product.imageUrl }}
+                onAddToCart={handleAddToCart}
+                onToggleFavorite={handleToggleFavorite}
+                onChat={handleChat}
+                onCall={handleCall}
+                onViewDetails={handleViewDetails}
+                isFavorited={favoritedProducts.includes(product._id)}
               />
             ))
           ) : (

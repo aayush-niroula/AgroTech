@@ -46,7 +46,9 @@ const Login: React.FC = () => {
             id: response.user.id,
             name: response.user.name,
             email: response.user.email,
-           
+            isAdmin: response.user.isAdmin,
+            createdAt: response.user.createdAt,
+            updatedAt: response.user.updatedAt,
           },
           token: response.token,
         })

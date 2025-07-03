@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import { Product } from "../models/product.model";
 import mongoose from "mongoose";
+import cloudinary from "../middleware/cloudinary";
+import streamifier from "streamifier";
 
 export const createProduct =async(req:Request,res:Response)=>{
    try {
@@ -23,7 +25,22 @@ export const createProduct =async(req:Request,res:Response)=>{
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'Product image is required' });
     }
-   const imageUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+     const uploadFromBuffer = (buffer: Buffer) => {
+      return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "products" },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+        streamifier.createReadStream(buffer).pipe(stream);
+      });
+    };
+   
+  const result: any = await uploadFromBuffer(req.file.buffer);
+    
+   const imageUrl = result.secure_url;
 
     const location = {
       type: 'Point' as const,

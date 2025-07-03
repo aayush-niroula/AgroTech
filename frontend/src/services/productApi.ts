@@ -1,4 +1,4 @@
-import type { IProduct } from "@/types/product";
+import type { ApiResponse, IProduct } from "@/types/product";
 import { api } from "./api";
 
 export const productApi = api.injectEndpoints({
@@ -26,7 +26,7 @@ export const productApi = api.injectEndpoints({
 
   
     getProducts: builder.query<
-      IProduct[],
+      ApiResponse,
       { category?: string; brand?: string; coordinates?: string; maxDistance?: number } | void
     >({
       query: (params) => {

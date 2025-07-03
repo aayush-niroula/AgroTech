@@ -2,11 +2,12 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 
 export interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-  isAdmin?: boolean;
+    id: string;
+    name: string;
+    email: string;
+    isAdmin: boolean;
+    createdAt: string;
+    updatedAt: string;
 }
 
 interface AuthState {
