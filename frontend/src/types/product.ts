@@ -37,7 +37,7 @@ export interface IProduct {
   __v: number;
 }
 
-export interface ApiResponse {
+export interface ApiResponse<T> {
   success: boolean;
-  data: IProduct[];
+  data: T;
 }

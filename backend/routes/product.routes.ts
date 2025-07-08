@@ -8,8 +8,15 @@ import {
   getRecommendedProducts,
   getProducts,
   incrementProductView,
+  toggleFavorite,
+  incrementProductInterest,
+  incrementChatCount,
+  getBehaviorBasedRecommendations,
+  recordProductViewBehavior,
 } from '../controllers/product.controller';
 import { upload } from '../middleware/multer';
+import { authMiddleware } from '../middleware/authMiddleware';
+
 
 const productRoutes = express.Router();
 
@@ -32,8 +39,24 @@ productRoutes.get('/search' ,async(req:Request,res:Response)=>{
 productRoutes.get('/recommendations' ,async(req:Request,res:Response)=>{
     getRecommendedProducts(req,res)
 })
-productRoutes.get('/:productId/view' ,async(req:Request,res:Response)=>{
+productRoutes.post('/:productId/view' ,async(req:Request,res:Response)=>{
     incrementProductView(req,res)
 })
+productRoutes.post('/:productId/favorite',authMiddleware,async(req:Request,res:Response)=>{
+    toggleFavorite(req,res)
+})
+productRoutes.post('/:productId/interest',authMiddleware,async(req:Request,res:Response)=>{
+    incrementProductInterest(req,res)
+})
+productRoutes.post('/:productId/chatCount',async(req:Request,res:Response)=>{
+    incrementChatCount(req,res)
+})
+productRoutes.get('/recommendations/behavior',authMiddleware,async(req:Request,res:Response)=>{
+    getBehaviorBasedRecommendations(req,res)
+})
+productRoutes.post('/:productId/record-view',authMiddleware, async(req:Request,res:Response)=>{
+    recordProductViewBehavior(req,res)
+})
+
 
 export default productRoutes;

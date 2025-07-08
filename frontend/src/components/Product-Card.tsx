@@ -15,6 +15,7 @@ import {
   Eye,
 } from "lucide-react";
 import type { IProduct, Seller } from "../types/product";
+import { useNavigate } from "react-router-dom";
 
 interface ProductCardProps {
   product: IProduct & { sellerId: Seller | string }; // support string or Seller object
@@ -38,8 +39,8 @@ export function ProductCard({
   className = "",
 }: ProductCardProps) {
   const [isImageLoading, setIsImageLoading] = useState(true);
-
-  // Helper to get seller name safely
+  const navigate = useNavigate()
+ 
   const getSellerName = (): string => {
     if (typeof product.sellerId === "object" && product.sellerId.name) {
       return product.sellerId.name;
@@ -170,34 +171,34 @@ export function ProductCard({
           </div>
         </CardContent>
 
-        <CardFooter className="p-4 pt-0 space-y-3">
-          {/* Action Buttons */}
-          <div className="flex gap-2 w-full">
-            <Button
-              onClick={() => onAddToCart?.(product._id)}
-              className="flex-1 bg-green-600 hover:bg-green-700"
-              size="sm"
-            >
-              <ShoppingCart className="w-4 h-4 mr-2" />
-              Add to Cart
-            </Button>
-            <Button onClick={() => onViewDetails?.(product._id)} variant="outline" size="sm" className="px-3">
-              <Eye className="w-4 h-4" />
-            </Button>
-          </div>
+<CardFooter className="p-4 pt-0 space-y-3">
+  <div className="flex flex-wrap gap-2 w-full">
+    {/* Product Details */}
+    <Button
+      onClick={() =>navigate(`/product/${product._id}`)}
+      className="flex-1 bg-green-600 hover:bg-green-700"
+      size="sm"
+    >
+       <Eye className="w-4 h-4" />
+      Product Details
+    </Button>
 
-          {/* Contact Buttons */}
-          <div className="flex gap-2 w-full">
-            <Button onClick={() => onChat?.(getSellerId())} variant="outline" size="sm" className="flex-1">
-              <MessageCircle className="w-4 h-4 mr-2" />
-              Chat
-            </Button>
-            <Button onClick={() => onCall?.(getSellerId())} variant="outline" size="sm" className="flex-1">
-              <Phone className="w-4 h-4 mr-2" />
-              Call
-            </Button>
-          </div>
-        </CardFooter>
+
+    {/* Chat */}
+    <Button
+      onClick={() => onChat?.(getSellerId())}
+      variant="outline"
+      size="sm"
+      className="flex-1"
+    >
+      <MessageCircle className="w-4 h-4 mr-2" />
+      Chat
+    </Button>
+
+    
+  </div>
+</CardFooter>
+
       </Card>
     </motion.div>
   );

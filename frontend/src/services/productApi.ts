@@ -3,7 +3,6 @@ import { api } from "./api";
 
 export const productApi = api.injectEndpoints({
   endpoints: (builder) => ({
-   
     createProduct: builder.mutation<
       IProduct,
       Partial<IProduct> & { latitude: number; longitude: number }
@@ -16,63 +15,70 @@ export const productApi = api.injectEndpoints({
           }
         });
         return {
-          url: '/products/',
-          method: 'POST',
+          url: "/products/",
+          method: "POST",
           body: formData,
         };
       },
-      invalidatesTags: ['Product'],
+      invalidatesTags: ["Product"],
     }),
 
-  
     getProducts: builder.query<
-      ApiResponse,
-      { category?: string; brand?: string; coordinates?: string; maxDistance?: number } | void
+      ApiResponse<IProduct[]>,
+      {
+        category?: string;
+        brand?: string;
+        coordinates?: string;
+        maxDistance?: number;
+      } | void
     >({
       query: (params) => {
         const query = params
-          ? '?' +
+          ? "?" +
             new URLSearchParams(
               Object.entries(params).reduce((acc, [key, value]) => {
                 if (value !== undefined) acc[key] = String(value);
                 return acc;
               }, {} as Record<string, string>)
             ).toString()
-          : '';
+          : "";
         return {
           url: `/products${query}`,
-          method: 'GET',
+          method: "GET",
         };
       },
-      providesTags: ['Product'],
+      providesTags: ["Product"],
     }),
 
     // ✅ Get Single Product by ID
-    getProductById: builder.query<IProduct, string>({
+    getProductById: builder.query<ApiResponse<IProduct>, string>({
       query: (id) => `/products/${id}`,
-      providesTags: ['Product'],
+      providesTags: ["Product"],
     }),
 
     // ✅ Update Product
     updateProduct: builder.mutation<
       IProduct,
-      { id: string; data: Partial<IProduct> & { latitude?: number; longitude?: number } }
+      {
+        id: string;
+        data: Partial<IProduct> & { latitude?: number; longitude?: number };
+      }
     >({
       query: ({ id, data }) => ({
         url: `/products/${id}`,
-        method: 'PUT',
+        method: "PUT",
         body: data,
       }),
-      invalidatesTags: ['Product'],
+      invalidatesTags: ["Product"],
     }),
 
     // ✅ Delete Product
     deleteProduct: builder.mutation<{ message: string }, string>({
       query: (id) => ({
         url: `/products/${id}`,
-        method: 'DELETE',
+        method: "DELETE",
       }),
-      invalidatesTags: ['Product'],
+      invalidatesTags: ["Product"],
     }),
 
     // ✅ Get Recommended Products
@@ -82,18 +88,49 @@ export const productApi = api.injectEndpoints({
     >({
       query: ({ productId, coordinates }) =>
         `/products/recommendations?productId=${productId}&coordinates=${coordinates}`,
-      providesTags: ['Product'],
+      providesTags: ["Product"],
     }),
 
-    // ✅ Increment Product View
     incrementProductView: builder.mutation<{ message: string }, string>({
       query: (productId) => ({
         url: `/products/${productId}/view`,
-        method: 'POST',
+        method: "POST",
       }),
-      invalidatesTags: ['Product'],
+      invalidatesTags: ["Product"],
+    }),
+
+    toggleFavorite: builder.mutation<
+      { message: string },
+      { productId: string; increment: boolean }
+    >({
+      query: ({ productId, increment }) => ({
+        url: `/products/${productId}/favorite`,
+        method: "POST",
+        body: { increment },
+      }),
+      invalidatesTags: ["Product"],
+    }),
+    incrementProductInterest: builder.mutation<{ message: string }, string>({
+      query: (productId) => ({
+        url: `/products/${productId}/interest`,
+        method: "POST",
+      }),
+      invalidatesTags: ["Product"],
+    }),
+    toggleChatCount: builder.mutation<{ message: string }, string>({
+      query: (productId) => ({
+        url: `/products/${productId}/chatCount`,
+        method: "POST",
+      }),
+      invalidatesTags: ["Product"],
+    }),
+    getBehaviorRecommendations: builder.query<IProduct[], { userId: string }>({
+      query: ({ userId }) =>
+        `/products/recommendations/behavior?userId=${userId}`,
+      providesTags: ["Product"],
     }),
   }),
+
   overrideExisting: false,
 });
 
@@ -105,4 +142,8 @@ export const {
   useDeleteProductMutation,
   useGetRecommendedProductsQuery,
   useIncrementProductViewMutation,
+  useToggleFavoriteMutation,
+  useIncrementProductInterestMutation,
+  useToggleChatCountMutation,
+  useGetBehaviorRecommendationsQuery
 } = productApi;

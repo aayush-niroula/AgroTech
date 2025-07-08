@@ -1,8 +1,18 @@
 import { Request, Response } from "express";
-import { Product } from "../models/product.model";
+import { Product, UserBehavior } from "../models/product.model";
 import mongoose from "mongoose";
 import cloudinary from "../middleware/cloudinary";
 import streamifier from "streamifier";
+import  {parseCoordinates}  from "../utils/parseCordinates";
+
+// Extend Express Request interface to include userId
+declare global {
+  namespace Express {
+    interface Request {
+      userId?: string;
+    }
+  }
+}
 
 export const createProduct =async(req:Request,res:Response)=>{
    try {
@@ -148,14 +158,7 @@ export const deleteProduct = async (req: Request, res: Response) => {
 };
 
 
-// 🛑 Helper to parse coordinates
-const parseCoordinates = (coord: string) => {
-  const [lng, lat] = coord.split(',').map(Number);
-  return [lng, lat];
-};
 
-
-// ✅ Get products with optional location filtering
 export const getProducts = async (req: Request, res: Response) => {
   try {
     const { category, brand, maxDistance, coordinates } = req.query;
@@ -165,21 +168,30 @@ export const getProducts = async (req: Request, res: Response) => {
     if (brand) filters.brand = brand;
 
     if (coordinates) {
-      const [lng, lat] = parseCoordinates(coordinates as string);
-      filters.location = {
-        $near: {
-          $geometry: { type: 'Point', coordinates: [lng, lat] },
-          $maxDistance: Number(maxDistance) || 50000, // default 50km
-        },
-      };
+      const coords = parseCoordinates(coordinates as string); // parseCoordinates returns [lng, lat]
+
+      if (coords && coords.length === 2) {
+        const [lng, lat] = coords;
+        filters.location = {
+          $nearSphere: {
+            $geometry: {
+              type: "Point",
+              coordinates: [lng, lat],
+            },
+            $maxDistance: Number(maxDistance) || 50000, // 50 km default in meters
+          },
+        };
+      } else {
+        return res.status(400).json({ message: "Invalid coordinates format" });
+      }
     }
 
-    const products = await Product.find(filters).populate('sellerId');
+    const products = await Product.find(filters).populate("sellerId");
 
-    res.json(products);
+    res.json({ data: products });
   } catch (error) {
-    console.error('Error fetching products:', error);
-    res.status(500).json({ message: 'Server Error' });
+    console.error("Error fetching products:", error);
+    res.status(500).json({ message: "Server Error" });
   }
 };
 
@@ -193,7 +205,11 @@ export const getRecommendedProducts = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Coordinates are required' });
     }
 
-    const [lng, lat] = parseCoordinates(coordinates as string);
+    const coords = parseCoordinates(coordinates as string);
+    if (!coords || coords.length !== 2) {
+      return res.status(400).json({ message: 'Invalid coordinates format' });
+    }
+    const [lng, lat] = coords;
 
     const currentProduct = await Product.findById(productId);
     if (!currentProduct) {
@@ -239,7 +255,6 @@ export const getRecommendedProducts = async (req: Request, res: Response) => {
 };
 
 
-// ✅ Increase view count (Call this on product view)
 export const incrementProductView = async (req: Request, res: Response) => {
   try {
     const { productId } = req.params;
@@ -253,3 +268,138 @@ export const incrementProductView = async (req: Request, res: Response) => {
   }
 };
 
+export const toggleFavorite = async (req: Request, res: Response) => {
+  try {
+    const { productId } = req.params;
+    const { increment } = req.body;
+
+    if (typeof increment !== 'boolean') {
+      return res.status(400).json({ message: 'Increment must be a boolean' });
+    }
+
+    const update = increment ? { $inc: { favorites: 1 } } : { $inc: { favorites: -1 } };
+
+    const updatedProduct = await Product.findByIdAndUpdate(productId, update, {
+      new: true,
+    });
+
+    if (!updatedProduct) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    res.json({ message: 'Favorite count updated', favorites: updatedProduct.favorites });
+  } catch (error) {
+    console.error('Error toggling favorite:', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+export const incrementProductInterest = async (req: Request, res: Response) => {
+  try {
+    const { productId } = req.params;
+
+    const updatedProduct = await Product.findByIdAndUpdate(
+      productId,
+      { $inc: { views: 1 } }, // or another field like 'interestCount'
+      { new: true }
+    );
+
+    if (!updatedProduct) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    res.json({ message: 'Product interest incremented', views: updatedProduct.views });
+  } catch (error) {
+    console.error('Error incrementing product interest:', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+export const incrementChatCount = async (req: Request, res: Response) => {
+  try {
+    const { productId } = req.params;
+
+    const updatedProduct = await Product.findByIdAndUpdate(
+      productId,
+      { $inc: { chatCount: 1 } },
+      { new: true }
+    );
+
+    if (!updatedProduct) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    res.json({ message: "Chat count incremented", product: updatedProduct });
+  } catch (error) {
+    console.error("Error incrementing chat count:", error);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
+export const getBehaviorBasedRecommendations = async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) return res.status(400).json({ message: "User ID is required" });
+
+    const behaviorLogs = await UserBehavior.find({ userId }).sort({ createdAt: -1 }).limit(50);
+
+    const interactedProductIds = behaviorLogs.map((b) => b.productId);
+    const interactedCategories = await Product.find({
+      _id: { $in: interactedProductIds },
+    }).distinct("category");
+
+    const recommendations = await Product.aggregate([
+      {
+        $match: {
+          category: { $in: interactedCategories },
+          _id: { $nin: interactedProductIds },
+        },
+      },
+      {
+        $addFields: {
+          score: {
+            $add: [
+              { $multiply: [{ $ifNull: ["$views", 0] }, 0.1] },
+              { $multiply: [{ $ifNull: ["$favorites", 0] }, 0.3] },
+              { $multiply: [{ $ifNull: ["$chatCount", 0] }, 0.4] },
+              { $multiply: [{ $ifNull: ["$rating", 0] }, 0.2] },
+            ],
+          },
+        },
+      },
+      { $sort: { score: -1 } },
+      { $limit: 10 },
+    ]);
+
+    res.json(recommendations);
+  } catch (err) {
+    console.error("Behavior-based recommendation error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const recordProductViewBehavior = async (req: Request, res: Response) => {
+  try {
+    const { productId } = req.params;
+    const userId = req.userId; 
+
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const behavior = new UserBehavior({
+      userId,
+      productId,
+      action: "view", 
+      createdAt: new Date(),
+    });
+
+    await behavior.save();
+
+    res.json({ message: "User behavior recorded" });
+  } catch (error) {
+    console.error("Error recording behavior:", error);
+    res.status(500).json({ message: "Server Error" });
+  }
+};

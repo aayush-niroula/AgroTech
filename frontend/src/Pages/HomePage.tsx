@@ -3,19 +3,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  Leaf,
   MapPin,
-  MessageCircle,
-  Phone,
   Camera,
   Users,
   Shield,
   Zap,
   Star,
   ArrowRight,
-  Globe,
+  
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
+import type { RootState } from "@/app/store";
+import { useGetBehaviorRecommendationsQuery } from "@/services/productApi";
+
 
 // Animation Variants
 const fadeInUp = {
@@ -68,6 +69,10 @@ const testimonials = [
 
 export default function HomePage() {
   const navigate = useNavigate();
+   const user = useSelector((state: RootState) => state.auth.user);
+//  const { data: recommendedProducts = [], isLoading } = useGetBehaviorRecommendationsQuery(
+//   user?._id ?? skipToken
+// );
 
   return (
     <>

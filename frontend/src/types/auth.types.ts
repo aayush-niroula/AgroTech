@@ -4,3 +4,10 @@ export interface Register{
   password?: string;
   avatarUrl?: string;
 }
+declare global {
+  namespace Express {
+    interface Request {
+      userId?: string;  // Add the userId property here
+    }
+  }
+}

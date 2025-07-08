@@ -16,7 +16,7 @@ export interface IProduct extends Document {
   sellerId: mongoose.Types.ObjectId;
   views: number;
   favorites: number;
-  soldCount: number;
+  chatCount: number;
   rating: number; 
   createdAt: Date;
   updatedAt: Date;
@@ -44,7 +44,7 @@ const productSchema = new mongoose.Schema<IProduct>({
   weight: { type: Number, required: true }, 
   views: { type: Number, default: 0 },         // How many times the product is viewed
   favorites: { type: Number, default: 0 },     // How many times it's favorited
-  soldCount: { type: Number, default: 0 },     // Number of sales
+  chatCount: { type: Number, default: 0 },     // Number of sales
   rating: { type: Number, default: 0 },        // Average rating from reviews
 
   sellerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -52,6 +52,20 @@ const productSchema = new mongoose.Schema<IProduct>({
   timestamps: true,
 });
 
+const userBehaviorSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
+  actionType: {
+    type: String,
+    enum: ["view", "favorite", "chat"],
+    required: true,
+  },
+  createdAt: { type: Date, default: Date.now },
+});
+
+
+
 productSchema.index({ location: '2dsphere' });
 
+export const UserBehavior = mongoose.model("UserBehavior", userBehaviorSchema);
 export const Product = mongoose.model<IProduct>('Product', productSchema);

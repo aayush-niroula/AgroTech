@@ -4,7 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MapView } from "@/components/Map";
 import { ProductCard } from "@/components/Product-Card";
-import { useGetProductsQuery } from "@/services/productApi";
+import {
+ 
+  useGetProductsQuery,
+  useIncrementProductViewMutation,
+  useToggleFavoriteMutation,
+  useIncrementProductInterestMutation,
+  useToggleChatCountMutation,
+} from "@/services/productApi";
 import type { IProduct, ApiResponse } from '@/types/product';
 
 const cities = [
@@ -27,6 +34,13 @@ export default function MarketplacePage() {
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
   const [favoritedProducts, setFavoritedProducts] = useState<string[]>([]);
   const [cartItems, setCartItems] = useState<string[]>([]);
+  const [toggleFavorite] = useToggleFavoriteMutation();
+const [incrementProductInterest] = useIncrementProductInterestMutation();
+const [incrementProductView] = useIncrementProductViewMutation();
+  const [toggleChatCount] = useToggleChatCountMutation();
+
+
+
 
   // Get user geolocation on mount
   useEffect(() => {
@@ -54,40 +68,53 @@ export default function MarketplacePage() {
   });
   console.log(data);
   
-const productList:IProduct[]=data?.data ?? [];
   // Categories
-const categories = useMemo(() => Array.from(new Set(productList.map((p) => p.category))), [productList]);
-
-// ✅ Filtering Logic
+  
+  const productList: IProduct[] = data?.data ?? [];
+  
+  const categories = useMemo(() => Array.from(new Set(productList.map((p) => p.category))), [productList]);
 const filteredProducts = useMemo(() => {
+  if (!productList.length) return [];
+
   let filtered = productList;
 
   if (searchTerm) {
-    filtered = filtered.filter((product) =>
-      [product.title, product.description, product.brand].some((field) =>
-        field.toLowerCase().includes(searchTerm.toLowerCase())
+    const lowerSearch = searchTerm.toLowerCase();
+    filtered = filtered.filter(product =>
+      [product.title, product.description, product.brand].some(field =>
+        field?.toLowerCase().includes(lowerSearch)
       )
     );
   }
 
   if (selectedCategory) {
-    filtered = filtered.filter((p) => p.category === selectedCategory);
+    const lowerCategory = selectedCategory.toLowerCase();
+    filtered = filtered.filter(product => product.category?.toLowerCase() === lowerCategory);
   }
 
   return filtered;
 }, [productList, searchTerm, selectedCategory]);
+
   // Handlers
   const handleAddToCart = (productId: string) => setCartItems((prev) => [...prev, productId]);
 
-  const handleToggleFavorite = (productId: string) => {
-    setFavoritedProducts((prev) =>
-      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]
-    );
-  };
+const handleToggleFavorite = async (productId: string) => {
+  const isFav = favoritedProducts.includes(productId);
+  setFavoritedProducts((prev) =>
+    isFav ? prev.filter((id) => id !== productId) : [...prev, productId]
+  );
+  await toggleFavorite({ productId, increment: !isFav });
+};
 
-  const handleChat = (sellerId: string) => alert(`Starting chat with seller: ${sellerId}`);
+const handleChat = async (sellerId: string, productId: string) => {
+  await toggleChatCount(productId);  // <-- call chatCount increment here
+  alert(`Chatting with seller: ${sellerId}`);
+};
   const handleCall = (sellerId: string) => alert(`Calling seller: ${sellerId}`);
-  const handleViewDetails = (productId: string) => alert(`Viewing details for product: ${productId}`);
+ const handleViewDetails = async (productId: string) => {
+  await incrementProductView(productId);
+  alert(`Viewing details for product: ${productId}`);
+};
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -217,9 +244,9 @@ const filteredProducts = useMemo(() => {
                 product={{ ...product, imageUrl: product.imageUrl }}
                 onAddToCart={handleAddToCart}
                 onToggleFavorite={handleToggleFavorite}
-                onChat={handleChat}
+                onChat={(sellerId) => handleChat(sellerId, product._id)}
                 onCall={handleCall}
-                onViewDetails={handleViewDetails}
+                 onViewDetails={() => handleViewDetails(product._id)}
                 isFavorited={favoritedProducts.includes(product._id)}
               />
             ))
