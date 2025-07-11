@@ -1,176 +1,164 @@
 import os
-import cv2
-import numpy as np
-from flask import Flask, request, render_template, send_from_directory, jsonify
-from werkzeug.utils import secure_filename
 import torch
 import torch.nn as nn
-from torchvision import transforms, models
-from PIL import Image
-from flask_cors import CORS
+import numpy as np
+import cv2
+from PIL import Image, ImageOps
+from flask import Flask, request, render_template
+from torchvision import models, transforms
+from werkzeug.utils import secure_filename
 
-app = Flask(__name__)
-CORS(app)
-# Configuration
-UPLOAD_FOLDER = 'static/uploads'
+# === CONFIGURATION ===
+CLASS_NAMES = [
+    'Pepper__bell___Bacterial_spot', 'Pepper__bell___healthy', 'Potato___Early_blight',
+    'Potato___Late_blight', 'Potato___healthy', 'Tomato_Bacterial_spot',
+    'Tomato_Early_blight', 'Tomato_Late_blight', 'Tomato_Leaf_Mold',
+    'Tomato_Septoria_leaf_spot', 'Tomato_Spider_mites_Two_spotted_spider_mite',
+    'Tomato__Target_Spot', 'Tomato__Tomato_YellowLeaf__Curl_Virus',
+    'Tomato__Tomato_mosaic_virus', 'Tomato_healthy'
+]
+
+MODEL_PATH = "checkpoints/model_best.pth.tar"
+UPLOAD_FOLDER = "static/uploads"
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+IMG_SIZE = 224
+MIN_CONFIDENCE = 0.70  # 70% confidence threshold
+MIN_GREEN_RATIO = 0.15  # Minimum green pixels to be plant
+MIN_EDGE_RATIO = 0.01   # Minimum edges to be leaf-like
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Device setup
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Model definition that exactly matches your training
-class PlantDiseaseModel(nn.Module):
-    def __init__(self, num_classes):
-        super().__init__()
-        # Load base ResNet18 without pretrained weights
-        self.base = models.resnet18(weights=None)
+# === MODEL LOADING ===
+def load_model():
+    """Load model with proper error handling"""
+    try:
+        model = models.mobilenet_v2(weights=None)
+        model.classifier[1] = nn.Linear(model.last_channel, len(CLASS_NAMES))
         
-        # Replace final layer with your custom head
-        num_features = self.base.fc.in_features
-        self.base.fc = nn.Sequential(
-            nn.Linear(num_features, 512),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(512, num_classes)
-        )
-    
-    def forward(self, x):
-        return self.base(x)
+        checkpoint = torch.load(MODEL_PATH, map_location=device)
+        state_dict = checkpoint.get('state_dict', checkpoint)  # Handle both formats
+        model.load_state_dict(state_dict)
+        model.eval().to(device)
+        print("✅ Model loaded successfully")
+        return model
+    except Exception as e:
+        print(f"❌ Model loading failed: {str(e)}")
+        exit(1)
 
-# Initialize model
-try:
-    print("Loading model...")
-    model = PlantDiseaseModel(num_classes=15)  # Update 15 to your actual class count
-    
-    # Load state dict with flexible key matching
-    state_dict = torch.load('plant_disease_model.pt', map_location=device)
-    
-    # Debug: Print expected and actual keys
-    print("\nExpected model keys:")
-    for k in model.state_dict().keys():
-        print(f"- {k}")
-    
-    print("\nSaved model keys:")
-    for k in state_dict.keys():
-        print(f"- {k}")
-    
-    # Handle key mismatches
-    new_state_dict = {}
-    for key, value in state_dict.items():
-        # Remove unexpected prefixes
-        new_key = key.replace("model.", "").replace("base_model.", "base.")
-        new_state_dict[new_key] = value
-    
-    model.load_state_dict(new_state_dict, strict=False)
-    model = model.to(device)
-    model.eval()
-    print("Model loaded successfully!")
-    
-except Exception as e:
-    print(f"\n❌ Failed to load model: {e}")
-    print("\nPossible solutions:")
-    print("1. Verify your model architecture matches the training code exactly")
-    print("2. Check if you saved the complete model (not just state_dict)")
-    print("3. Compare the printed keys above and adjust the key mapping")
-    exit(1)
+model = load_model()
 
-# Load class names
-try:
-    with open('class_names.txt') as f:
-        classes = [line.strip() for line in f.readlines()]
-    print(f"\nLoaded {len(classes)} classes")
-except FileNotFoundError:
-    print("\n❌ class_names.txt not found")
-    exit(1)
+# === IMAGE VALIDATION ===
+def validate_image(image_path):
+    """Comprehensive image validation with multiple checks"""
+    try:
+        # Basic file check
+        if not os.path.exists(image_path):
+            return False, "File not found"
+        
+        # Open image
+        img = cv2.imread(image_path)
+        if img is None:
+            return False, "Invalid image file"
+        
+        # Minimum size check
+        if img.shape[0] < 100 or img.shape[1] < 100:
+            return False, "Image too small (min 100x100px)"
+        
+        # Color analysis (plant detection)
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        green_mask = cv2.inRange(hsv, (35, 50, 50), (85, 255, 255))
+        green_ratio = np.sum(green_mask > 0) / (img.shape[0] * img.shape[1])
+        
+        # Texture analysis (leaf structure)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        edges = cv2.Canny(gray, 50, 150)
+        edge_ratio = np.sum(edges > 0) / (img.shape[0] * img.shape[1])
+        
+        # Combined validation
+        if green_ratio < MIN_GREEN_RATIO:
+            return False, "Not enough plant content detected"
+        if edge_ratio < MIN_EDGE_RATIO:
+            return False, "Image lacks leaf-like texture"
+            
+        return True, "Valid plant image"
+        
+    except Exception as e:
+        return False, f"Validation error: {str(e)}"
 
-# Image transformations
+# === IMAGE PROCESSING ===
 transform = transforms.Compose([
-    transforms.Resize(256),
-    transforms.CenterCrop(224),
+    transforms.Resize((IMG_SIZE, IMG_SIZE)),
     transforms.ToTensor(),
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+# === FLASK APP ===
+app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB max
 
-def is_plant_image(image):
-    """Check if image contains plant-like colors"""
-    try:
-        img_np = np.array(image)
-        if len(img_np.shape) != 3:
-            return False
+@app.route('/', methods=['GET', 'POST'])
+def handle_upload():
+    if request.method == 'POST':
+        # Validate file upload
+        if 'image' not in request.files:
+            return render_template('index.html', error="No file selected")
             
-        # Convert to HSV color space
-        hsv = cv2.cvtColor(img_np, cv2.COLOR_RGB2HSV)
+        file = request.files['image']
+        if file.filename == '':
+            return render_template('index.html', error="No file selected")
         
-        # Define green color range in HSV
-        lower_green = np.array([35, 50, 50])
-        upper_green = np.array([85, 255, 255])
-        
-        # Calculate green pixel percentage
-        mask = cv2.inRange(hsv, lower_green, upper_green)
-        green_ratio = np.sum(mask > 0) / (img_np.shape[0] * img_np.shape[1])
-        
-        return green_ratio > 0.1  # At least 10% green pixels
-    except Exception as e:
-        print(f"Plant detection error: {e}")
-        return False
+        if not (file and allowed_file(file.filename)):
+            return render_template('index.html', 
+                                error="Invalid file type. Only JPG/PNG/JPEG allowed")
 
-@app.route('/predict', methods=['POST'])
-def predict():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file uploaded'}), 400
-
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No file selected'}), 400
-
-    if file and allowed_file(file.filename):
         try:
+            # Secure file handling
             filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
-
-            img = Image.open(filepath).convert('RGB')
-
-            if not is_plant_image(img):
-                return jsonify({
-                    'prediction': 'NOT A PLANT',
-                    'confidence': 0,
-                    'message': 'The image does not contain enough plant-like features',
-                    'image_url': f'/static/uploads/{filename}'
-                })
-
+            save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(save_path)
+            
+            # Advanced image validation
+            is_valid, validation_msg = validate_image(save_path)
+            if not is_valid:
+                return render_template('index.html', 
+                                    error=f"Invalid image: {validation_msg}")
+            
+            # Process image
+            img = Image.open(save_path).convert("RGB")
             tensor = transform(img).unsqueeze(0).to(device)
+            
+            # Make prediction
             with torch.no_grad():
                 outputs = model(tensor)
-                probs = torch.nn.functional.softmax(outputs, dim=1)
-                conf, pred = torch.max(probs, 1)
-                conf_percent = round(conf.item() * 100, 2)
-
-            return jsonify({
-                'prediction': classes[pred.item()],
-                'confidence': conf_percent,
-                'image_url': f'/static/uploads/{filename}'
-            })
-
+                probs = torch.softmax(outputs, dim=1)
+                confidence, pred = torch.max(probs, dim=1)
+                confidence = float(confidence.item())
+                class_name = CLASS_NAMES[pred.item()]
+            
+            # Handle low confidence
+            if confidence < MIN_CONFIDENCE:
+                return render_template('index.html',
+                                    warning=f"Uncertain prediction ({confidence:.1%} confidence)",
+                                    image_url=filename)
+            
+            # Successful prediction
+            return render_template('result.html',
+                                prediction=class_name.replace('_', ' ').title(),
+                                confidence=f"{confidence:.1%}",
+                                image_url=filename)
+        
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            print(f"🚨 Processing error: {str(e)}")
+            return render_template('index.html',
+                                error="System error - please try another image")
+    
+    return render_template('index.html')
 
-    return jsonify({'error': 'Invalid file type'}), 400
-
-@app.route('/static/uploads/<filename>')
-def uploaded_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-
-# Root endpoint
-@app.route('/')
-def index():
-    return jsonify({"message": "Plant Disease Detection API is running"})
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 if __name__ == '__main__':
-    print("\nStarting Flask server...")
     app.run(host='0.0.0.0', port=5000, debug=True)
