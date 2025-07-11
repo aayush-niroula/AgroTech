@@ -1,6 +1,4 @@
-Sure! Here's the entire README.md content in Markdown format—just copy and paste directly into your README.md file:
 
-````markdown
 # 🌿 Plant Disease Detector (Flask + PyTorch)
 
 A simple and fast web app that detects plant leaf diseases using deep learning. Upload a leaf image and get instant predictions along with confidence.
@@ -36,8 +34,8 @@ Supports GPU (CUDA) acceleration if available.
 Clone the repo and install dependencies:
 
 ```bash
-git clone https://github.com/your-username/plant-disease-app.git
-cd plant-disease-app
+git clone https://github.com/aayush-niroula/AgroTech.git
+cd AgroTech
 
 python3 -m venv venv
 source venv/bin/activate        # On Windows: .\venv\Scripts\activate
@@ -126,14 +124,3 @@ Feel free to use, fork, deploy, and improve this project for research, education
 * Add batch testing UI
 
 Let me know and I’ll help you expand it!
-
-```
-
-Let me know if you'd also like:
-
-- An image badge or screenshot section
-- Deployment instructions (Render, Docker, Hugging Face)
-- Editable template for your GitHub link
-
-All ready to go.
-```
