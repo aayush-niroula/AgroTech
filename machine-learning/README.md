@@ -115,12 +115,3 @@ MIT License
 Feel free to use, fork, deploy, and improve this project for research, education, or real-world deployment.
 
 ---
-
-## 🌍 Want More?
-
-* Add Gemini AI integration for suggestions
-* Deploy on Render / Hugging Face Spaces
-* Add mobile PWA support
-* Add batch testing UI
-
-Let me know and I’ll help you expand it!
