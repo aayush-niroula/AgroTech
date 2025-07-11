@@ -1,25 +1,96 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Plant Disease Detector</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
-        .upload-box { border: 2px dashed #ccc; padding: 20px; text-align: center; margin: 20px 0; }
-        .btn { background: #4CAF50; color: white; padding: 10px 15px; border: none; cursor: pointer; }
-        .error { color: red; margin: 10px 0; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Plant Disease Detector</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f0fdf4;
+      color: #333;
+    }
+    .container {
+      max-width: 600px;
+      margin: 4rem auto;
+      padding: 2rem;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.05);
+    }
+    h1 {
+      color: #15803d;
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    .subtitle {
+      text-align: center;
+      font-size: 0.95rem;
+      color: #666;
+      margin-bottom: 2rem;
+    }
+    input[type="file"] {
+      width: 100%;
+      margin-bottom: 1rem;
+    }
+    button {
+      display: block;
+      width: 100%;
+      background: #15803d;
+      color: white;
+      border: none;
+      padding: 0.8rem;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background: #166534;
+    }
+    .error, .warning {
+      background: #fee2e2;
+      color: #b91c1c;
+      padding: 0.8rem;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+    .preview {
+      margin-top: 1.5rem;
+      text-align: center;
+    }
+    .preview img {
+      max-width: 200px;
+      border-radius: 8px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    }
+  </style>
 </head>
 <body>
-    <h1>Plant Disease Detection</h1>
+  <div class="container">
+    <h1>🌿 Plant Disease Detector</h1>
+    <div class="subtitle">Upload a clear image of a leaf to detect disease and get treatment tips.</div>
+
     {% if error %}
-        <div class="error">{{ error }}</div>
+      <div class="error">{{ error }}</div>
+    {% elif warning %}
+      <div class="warning">{{ warning }}</div>
     {% endif %}
-    <form method="post" enctype="multipart/form-data">
-        <div class="upload-box">
-            <input type="file" name="file" accept="image/*" required>
-            <p>Upload a clear photo of a plant leaf</p>
-        </div>
-        <button type="submit" class="btn">Analyze</button>
+
+    <form method="POST" enctype="multipart/form-data">
+      <input type="file" name="image" accept="image/*" required />
+      <button type="submit">🔍 Predict</button>
     </form>
+
+    {% if image_url %}
+      <div class="preview">
+        <h3>Uploaded Image:</h3>
+        <img src="{{ url_for('static', filename='uploads/' + image_url) }}" alt="Uploaded Image"/>
+      </div>
+    {% endif %}
+  </div>
 </body>
 </html>
