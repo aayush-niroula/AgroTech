@@ -115,7 +115,7 @@ export const Navbar = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Avatar className="cursor-pointer ring-2 ring-green-600/20">
-                <AvatarImage src={user?.avatar} alt={user?.name} />
+                {/* <AvatarImage src={user?.avatar} alt={user?.name} /> */}
                 <AvatarFallback>{user?.name?.charAt(0) ?? 'U'}</AvatarFallback>
               </Avatar>
             </DropdownMenuTrigger>
