@@ -158,42 +158,67 @@ export const deleteProduct = async (req: Request, res: Response) => {
 };
 
 
-
 export const getProducts = async (req: Request, res: Response) => {
   try {
     const { category, brand, maxDistance, coordinates } = req.query;
 
-    const filters: any = {};
-    if (category) filters.category = category;
-    if (brand) filters.brand = brand;
+    const baseQuery: Record<string, any> = {};
+    if (category) baseQuery.category = category;
+    if (brand) baseQuery.brand = brand;
+
+    let products;
 
     if (coordinates) {
-      const coords = parseCoordinates(coordinates as string); // parseCoordinates returns [lng, lat]
-
-      if (coords && coords.length === 2) {
-        const [lng, lat] = coords;
-        filters.location = {
-          $nearSphere: {
-            $geometry: {
-              type: "Point",
-              coordinates: [lng, lat],
-            },
-            $maxDistance: Number(maxDistance) || 50000, // 50 km default in meters
-          },
-        };
-      } else {
+      const coords = parseCoordinates(coordinates as string); // [lng, lat]
+      if (!coords) {
         return res.status(400).json({ message: "Invalid coordinates format" });
       }
+
+      const [lng, lat] = coords;
+
+      products = await Product.aggregate([
+        {
+          $geoNear: {
+            near: { type: "Point", coordinates: [lng, lat] },
+            distanceField: "distance",
+            spherical: true,
+            maxDistance: Number(maxDistance) || 50000,
+            query: baseQuery,
+          },
+        },
+        {
+          $addFields: {
+            sellerId: { $toObjectId: "$sellerId" }, // 👈 Convert string to ObjectId before lookup
+          },
+        },
+        {
+          $lookup: {
+            from: "users",
+            localField: "sellerId",
+            foreignField: "_id",
+            as: "seller",
+          },
+        },
+        {
+          $unwind: "$seller",
+        },
+      ]);
+    } else {
+      // No coordinates, basic filtering
+      products = await Product.find(baseQuery).populate("sellerId");
     }
 
-    const products = await Product.find(filters).populate("sellerId");
-
-    res.json({ data: products });
+    res.json({ success: true, data: products });
   } catch (error) {
-    console.error("Error fetching products:", error);
+    console.error("❌ Error fetching products:", error);
     res.status(500).json({ message: "Server Error" });
   }
 };
+
+
+
+
+
 
 
 // ✅ Get Recommended Products

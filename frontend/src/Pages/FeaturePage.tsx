@@ -37,12 +37,6 @@ const features = [
     description: "Connect instantly with farmers and experts through our integrated chat system",
     color: "bg-purple-100 text-purple-600",
   },
-  {
-    icon: Phone,
-    title: "Voice Calls",
-    description: "Make direct calls to farmers for immediate consultation and support",
-    color: "bg-orange-100 text-orange-600",
-  },
 ];
 
 export default function FeaturesPage() {

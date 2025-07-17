@@ -1,6 +1,12 @@
+export interface IUser {
+  _id: string;
+  name: string;
+  email?: string; 
+}
+
 export interface IConversation {
   _id: string;
-  members: string[];
+  members: IUser[]; 
   updatedAt: string;
   createdAt: string;
 }

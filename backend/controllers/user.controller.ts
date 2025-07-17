@@ -111,7 +111,7 @@ export const loginUser = async (req: Request, res: Response) => {
 };
 export const getUserProfile = async (req: Request, res: Response) => {
   try {
-    const userId = req.params.id;
+    const userId = req.params.userId;
 
     // Find user by ID
     const user = await User.findById(userId);
@@ -132,7 +132,7 @@ export const getUserProfile = async (req: Request, res: Response) => {
 
     res
       .status(200)
-      .json({ message: "User profile retrieved successfully", userResponse });
+      .json(userResponse);
   } catch (error) {
     console.error("Error retrieving user profile:", error);
     res.status(500).json({ message: "Internal server error" });

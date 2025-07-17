@@ -2,17 +2,17 @@ import { useParams } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useSelector } from 'react-redux';
-import type { RootState } from '@/app/store'; // adjust path to your store
+import type { RootState } from '@/app/store'; 
 import {
   useCreateOrGetConversationMutation,
   useGetMessagesQuery,
   useSendMessageMutation,
-} from '@/services/chatApi'; // adjust path to your chatApi hooks
+} from '@/services/chatApi'; 
 
 interface Message {
-  _id?: string; // from backend
-  id?: string;  // fallback local id
-  senderId: string;
+  _id?: string;
+  id?: string;  
+  senderId: string | { _id: string };
   receiverId: string;
   text: string;
   timestamp: string;
@@ -28,6 +28,8 @@ export default function ChatPage() {
 
   // Get logged in user from redux
   const currentUser = useSelector((state: RootState) => state.auth.user);
+  console.log("Current User",currentUser);
+  
   if (!currentUser) return <div className="p-4">Please login to chat.</div>;
 
   // RTK Query hooks
@@ -169,29 +171,36 @@ const handleSend = async () => {
         Chat with Seller: {sellerId}
       </header>
 
-      <main className="flex-grow overflow-auto mb-4 space-y-2">
-        {messages.map((msg) => {
-          const isMe = msg.senderId === currentUser.id;
-          return (
-            <div
-              key={msg._id || msg.id}
-              className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-[70%] p-2 rounded ${
-                  isMe ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-900'
-                }`}
-              >
-                <p>{msg.text}</p>
-                <small className="text-xs text-gray-700">
-                  {new Date(msg.timestamp).toLocaleTimeString()}
-                </small>
-              </div>
-            </div>
-          );
-        })}
-        <div ref={messagesEndRef} />
-      </main>
+<main className="flex-grow overflow-auto mb-4 space-y-2 flex flex-col">
+  {messages.map((msg) => {
+   const isMe =
+      typeof msg.senderId === 'object' && msg.senderId !== null && '_id' in msg.senderId
+        ? msg.senderId._id === currentUser.id
+        : msg.senderId === currentUser.id;
+
+    
+    console.log(isMe);
+    
+    return (
+      <div
+        key={msg._id || msg.id}
+        className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
+      >
+        <div
+          className={`max-w-[70%] p-2 rounded-xl shadow ${
+            isMe ? 'bg-green-500 text-white rounded-br-none' : 'bg-gray-300 text-gray-900 rounded-bl-none'
+          }`}
+        >
+          <p>{msg.text}</p>
+          <small className="text-xs text-gray-700">
+            {new Date(msg.timestamp).toLocaleTimeString()}
+          </small>
+        </div>
+      </div>
+    );
+  })}
+  <div ref={messagesEndRef} />
+</main>
 
       <footer className="flex gap-2">
         <input

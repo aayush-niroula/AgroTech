@@ -13,6 +13,7 @@ import PlantDiseaseDetection from './Pages/PlantDiseaseDetection'
 import AddProductForm from './components/AddProductForm'
 import ProductDetailPage from './Pages/ProductDetailsPage'
 import ChatPage from './Pages/ChatPage'
+import Inbox from './components/Inbox'
 
 
 const App = () => {
@@ -27,6 +28,7 @@ const App = () => {
         <Route path='/createproduct' element={<AddProductForm/>}/>
         <Route path='/product/:productId' element={<ProductDetailPage/>}/>
         <Route path='chat/:sellerId' element={<ChatPage/>}/>
+        <Route path="/seller/inbox" element={<Inbox />} />
       </Route>
 
       {/* Auth Pages (no Navbar) */}

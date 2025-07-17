@@ -12,5 +12,8 @@ userRoutes.post('/register', async (req: Request, res: Response) => {
 userRoutes.post('/login', async (req: Request, res: Response) => {
   await loginUser(req, res);
 });
+userRoutes.get('/:userId',async (req: Request, res: Response) => {
+  await getUserProfile(req, res);
+} )
 
 

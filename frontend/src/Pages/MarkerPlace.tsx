@@ -13,6 +13,7 @@ import {
   useToggleChatCountMutation,
 } from "@/services/productApi";
 import type { IProduct, ApiResponse } from '@/types/product';
+import { useNavigate } from "react-router-dom";
 
 const cities = [
   { name: "Kathmandu", coordinates: [85.324, 27.7172] },
@@ -39,7 +40,7 @@ const [incrementProductInterest] = useIncrementProductInterestMutation();
 const [incrementProductView] = useIncrementProductViewMutation();
   const [toggleChatCount] = useToggleChatCountMutation();
 
-
+const navigate = useNavigate()
 
 
   // Get user geolocation on mount
@@ -56,7 +57,8 @@ const [incrementProductView] = useIncrementProductViewMutation();
     }
   }, []);
 
-  // API Call
+ console.log(userLocation);
+ 
   const {
     data,
     isLoading,
@@ -66,7 +68,11 @@ const [incrementProductView] = useIncrementProductViewMutation();
     coordinates: userLocation ? `${userLocation[0]},${userLocation[1]}` : undefined,
     maxDistance: userLocation ? radius * 1000 : undefined,
   });
-  console.log(data);
+ console.log("🌍 Requesting products with:", {
+  category: selectedCategory,
+  coordinates: userLocation ? `${userLocation[0]},${userLocation[1]}` : undefined,
+  maxDistance: userLocation ? radius * 1000 : undefined,
+});;
   
   // Categories
   
@@ -108,9 +114,9 @@ const handleToggleFavorite = async (productId: string) => {
 
 const handleChat = async (sellerId: string, productId: string) => {
   await toggleChatCount(productId);  // <-- call chatCount increment here
-  alert(`Chatting with seller: ${sellerId}`);
+  navigate(`/chat/${sellerId}`);
 };
-  const handleCall = (sellerId: string) => alert(`Calling seller: ${sellerId}`);
+
  const handleViewDetails = async (productId: string) => {
   await incrementProductView(productId);
   alert(`Viewing details for product: ${productId}`);
@@ -127,19 +133,8 @@ const handleChat = async (sellerId: string, productId: string) => {
               <p className="text-gray-600">Fresh produce from local farmers</p>
             </div>
             <div className="flex items-center gap-4">
-              <Button variant="outline" size="sm">
-                <MapPin className="w-4 h-4 mr-2" />
-                Location
-              </Button>
-              <Button variant="outline" size="sm" className="relative">
-                <ShoppingCart className="w-4 h-4 mr-2" />
-                Cart
-                {cartItems.length > 0 && (
-                  <Badge className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-1 min-w-[1.25rem] h-5">
-                    {cartItems.length}
-                  </Badge>
-                )}
-              </Button>
+             
+              
             </div>
           </div>
         </div>
@@ -245,7 +240,6 @@ const handleChat = async (sellerId: string, productId: string) => {
                 onAddToCart={handleAddToCart}
                 onToggleFavorite={handleToggleFavorite}
                 onChat={(sellerId) => handleChat(sellerId, product._id)}
-                onCall={handleCall}
                  onViewDetails={() => handleViewDetails(product._id)}
                 isFavorited={favoritedProducts.includes(product._id)}
               />

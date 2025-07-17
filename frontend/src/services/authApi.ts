@@ -20,15 +20,18 @@ export interface LoginResponse {
 
 export const authApi = api.injectEndpoints({
   endpoints: (builder) => ({
-    login: builder.mutation<LoginResponse, LoginRequest>({
-      query: (credentials) => ({
-        url: '/users/login',
-        method: 'POST',
-        body: credentials,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    }),
+login: builder.mutation<LoginResponse, LoginRequest>({
+  query: (credentials) => ({
+    url: '/users/login',
+    method: 'POST',
+    body: credentials,
+    headers: { 'Content-Type': 'application/json' },
   }),
+}),
+getUserById: builder.query<LoginResponse["user"], string>({
+  query: (userId) => `/users/${userId}`,
+}),
+}),
 });
 
-export const { useLoginMutation } = authApi;
+export const { useLoginMutation,useGetUserByIdQuery } = authApi;
