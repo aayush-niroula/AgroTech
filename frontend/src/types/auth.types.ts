@@ -7,7 +7,11 @@ export interface Register{
 declare global {
   namespace Express {
     interface Request {
-      userId?: string;  // Add the userId property here
+      user?: {
+        _id: string;
+        name?: string;
+        email?: string;
+      };
     }
   }
 }

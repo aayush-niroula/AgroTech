@@ -195,6 +195,7 @@ export function ProductCard({
       Chat
     </Button>
 
+
     
   </div>
 </CardFooter>

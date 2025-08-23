@@ -1,12 +1,12 @@
 // src/context/AuthContext.tsx
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
 
 interface User {
   id: string;
   name: string;
   email: string;
-  // add more fields as needed
+  token: string; // Required for API calls
 }
 
 interface AuthContextType {
@@ -20,9 +20,17 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
 
+  // 🔹 Restore user from localStorage on app load
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
   const login = (userData: User) => {
     setUser(userData);
-    localStorage.setItem("user", JSON.stringify(userData)); // Optional: persist login
+    localStorage.setItem("user", JSON.stringify(userData));
   };
 
   const logout = () => {
@@ -37,7 +45,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   );
 };
 
-// Custom hook for using AuthContext
+// 🔹 Custom hook for easy access
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) throw new Error("useAuth must be used within AuthProvider");

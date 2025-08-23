@@ -3,9 +3,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Leaf, Menu, X, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSelector, useDispatch } from "react-redux";
-import type { RootState } from "@/app/store";
+import { store, type RootState } from "@/app/store";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {socket} from "@/utils/socketClient"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,24 +16,28 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { logout } from "@/app/slices/authSlice";
+import { setChatUnread } from "@/app/slices/notificationSlice";
 
 interface NavLink {
   href: string;
   label: string;
 }
 
+
+
 export const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [isDark, setIsDark] = useState<boolean>(() =>
-    document.documentElement.classList.contains("dark")
+  document.documentElement.classList.contains("dark")
   );
 
   const user = useSelector((state: RootState) => state.auth.user);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-
+const unreadMessagesMap = useSelector((state: RootState) => state.notification.chatUnreadMap);
+  const unreadCount = Object.keys(unreadMessagesMap).length;
   const navLinks: NavLink[] = [
     { href: "/features", label: "Features" },
     { href: "/marketplace", label: "Marketplace" },
@@ -45,6 +50,10 @@ export const Navbar = () => {
     dispatch(logout());
     navigate("/login");
   };
+  console.log("Unread Count",unreadCount);
+  
+  console.log("🔍 Redux unread map:", unreadMessagesMap);
+
 
   useEffect(() => {
     const handleScroll = () => {
@@ -54,6 +63,32 @@ export const Navbar = () => {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+useEffect(() => {
+  const handleNewMessage = (message: any) => {
+    const senderId =
+      typeof message.senderId === "object"
+        ? message.senderId._id
+        : message.senderId;
+
+    if (senderId !== user?.id) {
+      dispatch(setChatUnread({ senderId }));
+    }
+
+    console.log("🔔 Message received from:", senderId);
+  };
+
+  socket.on("new_message", handleNewMessage);
+  return () => {
+    socket.off("new_message", handleNewMessage);
+  };
+}, [user?.id, dispatch]);
+
+
+
+
+
+
 
   const toggleTheme = () => {
     setIsDark(!isDark);
@@ -131,8 +166,13 @@ export const Navbar = () => {
               <DropdownMenuItem onClick={() => navigate("/profile")}>
                 Profile
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate("/seller/inbox")}>
+              <DropdownMenuItem onClick={() => {
+                navigate("/seller/inbox");
+              }}>
                 📬 Inbox
+                {unreadCount >0 &&(
+                  <span className="ml-2 inline-block w-3 h-3 bg-red-500 rounded-full" />
+                )}
               </DropdownMenuItem>
               <DropdownMenuItem>Settings</DropdownMenuItem>
               <DropdownMenuSeparator />

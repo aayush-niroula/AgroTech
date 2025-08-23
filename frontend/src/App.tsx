@@ -12,7 +12,7 @@ import FeaturesPage from './Pages/FeaturePage'
 import PlantDiseaseDetection from './Pages/PlantDiseaseDetection'
 import AddProductForm from './components/AddProductForm'
 import ProductDetailPage from './Pages/ProductDetailsPage'
-import ChatPage from './Pages/ChatPage'
+import {ChatPage }from './Pages/ChatPage'
 import Inbox from './components/Inbox'
 
 

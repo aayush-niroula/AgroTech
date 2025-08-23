@@ -101,7 +101,7 @@ const filteredProducts = useMemo(() => {
   return filtered;
 }, [productList, searchTerm, selectedCategory]);
 
-  // Handlers
+
   const handleAddToCart = (productId: string) => setCartItems((prev) => [...prev, productId]);
 
 const handleToggleFavorite = async (productId: string) => {
