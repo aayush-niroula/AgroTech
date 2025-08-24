@@ -30,23 +30,24 @@ export const createOrGetConversation = async (req: AuthenticatedRequest, res: Re
 
 // Send message
 export const sendMessage = async (req: Request, res: Response) => {
-  const { text, senderId } = req.body;
+  const { text, sender } = req.body;
   const { conversationId } = req.params;
 
-  if (!text || !senderId || !conversationId) {
+  if (!text || !sender || !conversationId) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
   try {
     const message = new Message({
       conversationId,
-      senderId,
+      senderId:sender,
       text,
     });
     await message.save();
 
     res.status(201).json({ success: true, data: message });
   } catch (error) {
+    console.log(error)
     res.status(500).json({ message: "Failed to send message" });
   }
 };
@@ -63,7 +64,7 @@ export const getMessages = async (req: Request, res: Response) => {
     const messages = await Message.find({ conversationId })
       .populate("senderId", "name avatarUrl")
       .sort({ createdAt: 1 });
-
+    // console.log("messages", messages);
     res.status(200).json({ success: true, data: messages });
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch messages" });

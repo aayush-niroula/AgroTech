@@ -5,7 +5,7 @@ export const chatApi = api.injectEndpoints({
   endpoints: (build) => ({
     // Get all conversations of a user
     getUserConversations: build.query<IConversation[], string>({
-      query: (userId) => `/chat/conversations/${userId}`,
+      query: (userId) => `/chat/conversation/${userId}`,
       providesTags: (result) =>
         result
           ? [
@@ -23,9 +23,9 @@ export const chatApi = api.injectEndpoints({
       { buyerId: string; sellerId: string; productId?: string }
     >({
       query: ({ buyerId, sellerId, productId }) => ({
-        url: `/chat/conversation`,
+        url: `/chat/conversation/${sellerId}`,
         method: "POST",
-        body: { buyerId, sellerId, productId },
+        body: { buyerId, productId },
       }),
       transformResponse: (response: { success: boolean; data: IConversation }) =>
         response.data,
@@ -34,11 +34,11 @@ export const chatApi = api.injectEndpoints({
 
     // Get messages in a conversation
     getMessages: build.query<IMessage[], string>({
-      query: (conversationId) => `/chat/messages/${conversationId}`,
-      providesTags: (result, error, conversationId) =>
-        result
+      query: (conversationId) => `/chat/message/${conversationId}`,
+      providesTags: (_result, _error, conversationId) =>
+        _result
           ? [
-              ...result.map(({ _id }) => ({ type: "Message" as const, id: _id })),
+              ..._result.map(({ _id }) => ({ type: "Message" as const, id: _id })),
               { type: "Message", id: conversationId },
             ]
           : [{ type: "Message", id: conversationId }],
@@ -52,11 +52,11 @@ export const chatApi = api.injectEndpoints({
       { conversationId: string; sender: string; text: string }
     >({
       query: ({ conversationId, sender, text }) => ({
-        url: `/chat/message`,
+        url: `/chat/message/${conversationId}`,
         method: "POST",
-        body: { conversationId, sender, text },
+        body: { sender, text },
       }),
-      invalidatesTags: (result, error, { conversationId }) => [
+      invalidatesTags: (_result, _error, { conversationId }) => [
         { type: "Message", id: conversationId },
         { type: "Conversation", id: "LIST" },
       ],

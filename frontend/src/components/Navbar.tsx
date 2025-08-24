@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Leaf, Menu, X, Sun, Moon } from "lucide-react";
+import { Leaf, Menu, X, Sun, Moon, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useSelector, useDispatch } from "react-redux";
-import { store, type RootState } from "@/app/store";
+import { useDispatch, useSelector } from "react-redux";
+import { type RootState } from "@/app/store";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {socket} from "@/utils/socketClient"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { socket } from "@/utils/socketClient";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,44 +16,81 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { logout } from "@/app/slices/authSlice";
-import { setChatUnread } from "@/app/slices/notificationSlice";
+import { useGetNotificationsQuery, useMarkNotificationAsReadMutation } from "@/services/notificationApi";
+import { useGetUserByIdQuery } from "@/services/authApi";
 
-interface NavLink {
-  href: string;
-  label: string;
+interface Notification {
+  _id: string;
+  senderId: {
+    _id: string;
+    name: string;
+  };
+  conversationId: string;
+  messageId: string;
+  text: string;
+  isRead: boolean;
+  createdAt: string;
 }
 
+// Separate component for rendering a single notification
+const NotificationItem = ({
+  notification,
+  onClick,
+}: {
+  notification: Notification;
+  onClick: (notification: Notification) => void;
+}) => {
+  const { data: sender, isLoading: isSenderLoading } = useGetUserByIdQuery(notification.senderId._id);
 
+  return (
+    <DropdownMenuItem
+      onClick={() => onClick(notification)}
+      className={`flex flex-col items-start ${notification.isRead ? "" : "font-semibold"}`}
+    >
+      <div className="flex items-center space-x-2">
+        <Avatar className="w-6 h-6">
+          <AvatarFallback>
+            {isSenderLoading ? "..." : sender?.name?.charAt(0) || "U"}
+          </AvatarFallback>
+        </Avatar>
+        <span>{isSenderLoading ? "Loading..." : sender?.name || "Unknown"}</span>
+      </div>
+      <p className="text-sm text-gray-500 truncate w-full">
+        {notification.text}
+      </p>
+      <p className="text-xs text-gray-400">
+        {new Date(notification.createdAt).toLocaleTimeString()}
+      </p>
+    </DropdownMenuItem>
+  );
+};
 
 export const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [isDark, setIsDark] = useState<boolean>(() =>
-  document.documentElement.classList.contains("dark")
+    document.documentElement.classList.contains("dark")
   );
 
   const user = useSelector((state: RootState) => state.auth.user);
-  const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-const unreadMessagesMap = useSelector((state: RootState) => state.notification.chatUnreadMap);
-  const unreadCount = Object.keys(unreadMessagesMap).length;
-  const navLinks: NavLink[] = [
-    { href: "/features", label: "Features" },
-    { href: "/marketplace", label: "Marketplace" },
-    { href: "/how-it-works", label: "How it Works" },
-    { href: "/contact", label: "Contact" },
-    {href:'/createproduct', label:"Add product"}
-  ];
+  const dispatch = useDispatch();
+  const { data: notifications = [], isLoading, refetch } = useGetNotificationsQuery(undefined, {
+    skip: !user,
+  });
+  const [markNotificationAsRead] = useMarkNotificationAsReadMutation();
+  const unreadCount = notifications.filter(n => !n.isRead).length;
 
-  const handleLogout = () => {
-    dispatch(logout());
-    navigate("/login");
-  };
-  console.log("Unread Count",unreadCount);
-  
-  console.log("🔍 Redux unread map:", unreadMessagesMap);
-
+  useEffect(() => {
+    socket.on("receive_notification", () => {
+      console.log("receive_notification");
+      refetch();
+    });
+    return () => {
+      socket.off("receive_notification");
+    };
+  }, [refetch]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -64,35 +101,25 @@ const unreadMessagesMap = useSelector((state: RootState) => state.notification.c
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-useEffect(() => {
-  const handleNewMessage = (message: any) => {
-    const senderId =
-      typeof message.senderId === "object"
-        ? message.senderId._id
-        : message.senderId;
-
-    if (senderId !== user?.id) {
-      dispatch(setChatUnread({ senderId }));
-    }
-
-    console.log("🔔 Message received from:", senderId);
+  const handleLogout = () => {
+    dispatch(logout());
+    navigate("/login");
   };
-
-  socket.on("new_message", handleNewMessage);
-  return () => {
-    socket.off("new_message", handleNewMessage);
-  };
-}, [user?.id, dispatch]);
-
-
-
-
-
-
 
   const toggleTheme = () => {
     setIsDark(!isDark);
     document.documentElement.classList.toggle("dark", !isDark);
+  };
+
+  const handleNotificationClick = async (notification: Notification) => {
+    if (!notification.isRead) {
+      try {
+        await markNotificationAsRead(notification._id).unwrap();
+      } catch (error) {
+        console.error("Failed to mark notification as read:", error);
+      }
+    }
+    navigate(`/seller/inbox?conversationId=${notification.conversationId}`);
   };
 
   return (
@@ -107,7 +134,6 @@ useEffect(() => {
       transition={{ duration: 0.6, ease: "easeOut" }}
     >
       <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-        {/* Logo */}
         <div
           onClick={() => navigate("/")}
           className="flex items-center space-x-2 cursor-pointer"
@@ -120,9 +146,14 @@ useEffect(() => {
           </span>
         </div>
 
-        {/* Desktop Nav */}
         <nav className="hidden md:flex items-center space-x-6">
-          {navLinks.map((link) => (
+          {[
+            { href: "/features", label: "Features" },
+            { href: "/marketplace", label: "Marketplace" },
+            { href: "/how-it-works", label: "How it Works" },
+            { href: "/contact", label: "Contact" },
+            { href: "/createproduct", label: "Add product" },
+          ].map((link) => (
             <a
               key={link.href}
               href={link.href}
@@ -137,7 +168,6 @@ useEffect(() => {
           ))}
         </nav>
 
-        {/* Actions */}
         <div className="flex items-center space-x-4">
           <Button variant="ghost" onClick={toggleTheme} size="icon">
             {isDark ? (
@@ -147,11 +177,45 @@ useEffect(() => {
             )}
           </Button>
 
-          {/* Avatar */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="relative">
+                <Bell className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-0 right-0 inline-block w-3 h-3 bg-red-500 rounded-full" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-80">
+              <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {isLoading ? (
+                <DropdownMenuItem className="text-gray-500">
+                  Loading notifications...
+                </DropdownMenuItem>
+              ) : notifications.length === 0 ? (
+                <DropdownMenuItem className="text-gray-500">
+                  No notifications
+                </DropdownMenuItem>
+              ) : (
+                notifications.slice(0, 5).map((notification) => (
+                  <NotificationItem
+                    key={notification._id}
+                    notification={notification}
+                    onClick={handleNotificationClick}
+                  />
+                ))
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate("/seller/inbox")}>
+                View All Notifications
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Avatar className="cursor-pointer ring-2 ring-green-600/20">
-                {/* <AvatarImage src={user?.avatar} alt={user?.name} /> */}
                 <AvatarFallback>{user?.name?.charAt(0) ?? "U"}</AvatarFallback>
               </Avatar>
             </DropdownMenuTrigger>
@@ -166,11 +230,9 @@ useEffect(() => {
               <DropdownMenuItem onClick={() => navigate("/profile")}>
                 Profile
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => {
-                navigate("/seller/inbox");
-              }}>
+              <DropdownMenuItem onClick={() => navigate("/seller/inbox")}>
                 📬 Inbox
-                {unreadCount >0 &&(
+                {unreadCount > 0 && (
                   <span className="ml-2 inline-block w-3 h-3 bg-red-500 rounded-full" />
                 )}
               </DropdownMenuItem>
@@ -182,7 +244,6 @@ useEffect(() => {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Mobile Menu Button */}
           <Button
             variant="ghost"
             onClick={() => setMobileOpen(!mobileOpen)}
@@ -198,7 +259,6 @@ useEffect(() => {
         </div>
       </div>
 
-      {/* Mobile Menu */}
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
@@ -207,7 +267,13 @@ useEffect(() => {
             exit={{ y: -20, opacity: 0 }}
             className="md:hidden bg-white dark:bg-gray-900 px-6 py-4 border-t dark:border-gray-800 space-y-4"
           >
-            {navLinks.map((link) => (
+            {[
+              { href: "/features", label: "Features" },
+              { href: "/marketplace", label: "Marketplace" },
+              { href: "/how-it-works", label: "How it Works" },
+              { href: "/contact", label: "Contact" },
+              { href: "/createproduct", label: "Add product" },
+            ].map((link) => (
               <a
                 key={link.href}
                 href={link.href}

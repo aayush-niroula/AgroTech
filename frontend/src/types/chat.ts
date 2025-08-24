@@ -25,9 +25,24 @@ export interface IMessage {
   text: string;
   read: boolean;      
   createdAt: string;
+  timestamp: string;
 }
 
 export interface IMessageResponse {
   success: boolean;
   data: IMessage;
+}
+
+export interface Notification {
+  _id: string;
+  senderId: {
+    _id: string;
+    name: string;
+    // avatarUrl?: string;
+  };
+  conversationId: string;
+  messageId: string;
+  text: string;
+  isRead: boolean;
+  createdAt: string;
 }

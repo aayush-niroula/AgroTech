@@ -9,6 +9,8 @@ import http from "http";
 import { Server } from "socket.io";
 import chatRoutes from "./routes/chat.routes";
 import { Conversation, Message } from "./models/chat.model";
+import notificationRoutes from "./routes/notification.routes";
+import { setupSocketIO } from "./utils/socketService";
 
 dotenv.config();
 const app = express();
@@ -30,6 +32,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/products", productRoutes);
 app.use("/uploads", express.static("uploads"));
 app.use("/api/chat", chatRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 dbConnection();
 
@@ -39,55 +42,50 @@ const io = new Server(server, {
     credentials: true,
   },
 });
-app.set("io", io);
 
-io.on("connection", (socket) => {
-  console.log("⚡ New client connected", socket.id);
 
-  // Track online users
-  socket.on("addUser", (userId: string) => {
-    activeUsers.set(userId, socket.id);
-    console.log("Active Users:", Array.from(activeUsers.keys()));
-  });
+setupSocketIO(io, activeUsers);
+// io.on("connection", (socket) => {
+//   console.log("⚡ New client connected", socket.id);
 
-  // Send message in real-time
-  socket.on("sendMessage", async (data) => {
-    const { conversationId, sender, text } = data;
-    try {
-      // Save message
-      const message = await Message.create({ conversationId, sender, text });
+//   // Track online users
+//   socket.on("addUser", (userId: string) => {
+//     activeUsers.set(userId, socket.id);
+//     console.log("Active Users:", Array.from(activeUsers.keys()));
+//   });
 
-      // Update last message in conversation
-      await Conversation.findByIdAndUpdate(conversationId, { lastMessage: text });
+//   // Join conversation room
+//   socket.on("join_conversation", (conversationId: string) => {
+//     socket.join(conversationId);
+//     console.log(User joined conversation: ${conversationId});
+//   });
 
-      // Notify all members except sender
-      const conversation = await Conversation.findById(conversationId);
-      if (!conversation) return;
-      conversation.members.forEach((memberId) => {
-        if (memberId.toString() !== sender) {
-          const socketId = activeUsers.get(memberId.toString());
-          if (socketId) {
-            io.to(socketId).emit("getMessage", {
-              message,
-              senderId: sender,
-              conversationId,
-            });
-          }
-        }
-      });
-    } catch (err) {
-      console.error(err);
-    }
-  });
+//   // Listen for new messages from client
+//   socket.on("send_message", ({ conversationId, message }) => {
+//     console.log(message)
+//     // Normalize message to match frontend's Message interface
+//     const normalizedMessage = {
+//       _id: message._id?.toString() || new mongoose.Types.ObjectId().toString(),
+//       senderId: message.senderId?.toString() || "",
+//       receiverId: message.receiverId?.toString() || "",
+//       text: message.text || "Message content missing",
+//       timestamp: message.createdAt
+//         ? new Date(message.createdAt).toISOString()
+//         : new Date().toISOString(),
+//     };
+    
+//     // Emit to all clients in the conversation room
+//     io.to(conversationId).emit("receive_message", normalizedMessage);
+//     console.log("Emitting receive_message:", normalizedMessage);
+//   });
 
-  // Remove disconnected users
-  socket.on("disconnect", () => {
-    activeUsers.forEach((value, key) => {
-      if (value === socket.id) activeUsers.delete(key);
-    });
-    console.log("Client disconnected", socket.id);
-  });
-});
+//   socket.on("disconnect", () => {
+//     activeUsers.forEach((value, key) => {
+//       if (value === socket.id) activeUsers.delete(key);
+//     });
+//     console.log("Client disconnected", socket.id);
+//   });
+// });
 
 server.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);

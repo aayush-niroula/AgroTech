@@ -14,13 +14,11 @@ import {
 } from 'redux-persist';
 import storage from 'redux-persist/lib/storage';
 import { plantApi } from '@/services/plantApi';
-import notificationReducer from './slices/notificationSlice'
 
 const rootReducer = combineReducers({
   [api.reducerPath]: api.reducer,
   [plantApi.reducerPath]:plantApi.reducer,
   auth: authReducer,
-  notification: notificationReducer
 
 });
 
