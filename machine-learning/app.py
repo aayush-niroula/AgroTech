@@ -8,7 +8,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from torchvision import models, transforms
 from werkzeug.utils import secure_filename
-
+from disease_info import DISEASE_INFO
 # === CONFIGURATION ===
 CLASS_NAMES = [
     'Pepper__bell___Bacterial_spot', 'Pepper__bell___healthy', 'Potato___Early_blight',
@@ -136,7 +136,8 @@ def predict():
         return jsonify({
             "prediction": class_name.replace("_", " ").title(),
             "confidence": round(confidence * 100, 2),
-            "image_url": f"/static/uploads/{filename}"
+            "image_url": f"/static/uploads/{filename}",
+            "info":DISEASE_INFO.get(class_name,{"causes":"Unknown","treatment":[],"prevention":[]})
         }), 200
 
     except Exception as e:
