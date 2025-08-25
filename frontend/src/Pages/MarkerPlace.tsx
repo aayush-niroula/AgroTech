@@ -11,13 +11,17 @@ import {
   useToggleFavoriteMutation,
 } from '@/services/productApi';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import type { IProduct, ApiResponse, Seller } from '@/types/product';
 import { debounce } from 'lodash';
 
+// Use environment variable for API key
 const OPENCAGE_API_KEY = 'baffb2c26c114e6994d055bfeee4afda';
 
 async function getCoords(address: string): Promise<{ lat: number; lng: number }> {
-  const url = `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(address)}&key=${OPENCAGE_API_KEY}&limit=1&countrycode=np`;
+  const url = `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(
+    address
+  )}&key=${OPENCAGE_API_KEY}&limit=1&countrycode=np`;
   try {
     const res = await fetch(url);
     const data = await res.json();
@@ -46,12 +50,13 @@ export default function MarketplacePage() {
   const [geocodingLoading, setGeocodingLoading] = useState(false);
   const [geocodingError, setGeocodingError] = useState<string | null>(null);
   const [selectedProductForRoute, setSelectedProductForRoute] = useState<IProduct | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null); // New state for mutation errors
 
   const navigate = useNavigate();
   const [toggleFavorite] = useToggleFavoriteMutation();
   const [incrementProductView] = useIncrementProductViewMutation();
-
-  // Debounced search location function
+  const isAuthenticated = useSelector((state: any) => state.auth.isAuthenticated); // Adjust based on your auth state
+ 
   const debouncedSearchLocation = useCallback(
     debounce(async (query: string) => {
       if (!query) return;
@@ -77,7 +82,6 @@ export default function MarketplacePage() {
     }
   }, [locationQuery, debouncedSearchLocation]);
 
-  // Get user geolocation on mount
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -88,8 +92,7 @@ export default function MarketplacePage() {
           setIsGeolocationReady(true);
         },
         () => {
-          // Fallback: Kathmandu
-          setUserLocation([85.324, 27.7172]);
+          setUserLocation([85.324, 27.7172]); // Kathmandu
           setMapCenter([27.7172, 85.324]);
           setIsGeolocationReady(true);
         },
@@ -102,7 +105,6 @@ export default function MarketplacePage() {
     }
   }, []);
 
-  // Watch location if tracking enabled
   useEffect(() => {
     let watchId: number | undefined;
     if (trackLocation && navigator.geolocation) {
@@ -128,33 +130,26 @@ export default function MarketplacePage() {
     };
   }, [trackLocation]);
 
-  // Fetch products
-  
-  const queryParams: any = {};
-if (selectedCategory) queryParams.category = selectedCategory;
-if (trackLocation || locationQuery) {
-  if (userLocation) {
-    queryParams.coordinates = `${userLocation[0]},${userLocation[1]}`;
-    queryParams.maxDistance = radius * 1000;
-  }
-}
+  const queryParams: any = {
+    category: selectedCategory || undefined,
+    searchTerm: searchTerm || undefined, // Add searchTerm for backend filtering
+    coordinates: userLocation ? `${userLocation[0]},${userLocation[1]}` : undefined,
+    maxDistance: userLocation ? radius * 1000 : undefined,
+  };
 
-const { data, isLoading, isError } = useGetProductsQuery(queryParams);
-
-  
+  const { data, isLoading, isError, error } = useGetProductsQuery(queryParams);
 
   const productList: IProduct[] = (data as ApiResponse<IProduct[]> | undefined)?.data ?? [];
 
-  
   const categories = useMemo(
     () => Array.from(new Set(productList.map((p) => p.category).filter(Boolean))),
     [productList]
   );
 
-  // Filtered products
+  // Client-side filtering (optional if backend handles searchTerm)
   const filteredProducts = useMemo(() => {
     let filtered = [...productList];
-    if (searchTerm) {
+    if (searchTerm && !queryParams.searchTerm) { // Only filter client-side if backend doesn't
       const lowerSearch = searchTerm.toLowerCase();
       filtered = filtered.filter((product) =>
         [product.title, product.description, product.brand].some((field) =>
@@ -162,42 +157,47 @@ const { data, isLoading, isError } = useGetProductsQuery(queryParams);
         )
       );
     }
-    if (selectedCategory) {
-      filtered = filtered.filter(
-        (product) => product.category?.toLowerCase() === selectedCategory.toLowerCase()
-      );
-    }
     return filtered;
   }, [productList, searchTerm, selectedCategory]);
 
-  // Handlers
   const handleToggleFavorite = async (productId: string) => {
+    setActionError(null); // Clear previous errors
+    if (!isAuthenticated) {
+      setActionError('Please log in to favorite products.');
+      navigate('/login');
+      return;
+    }
     try {
       const isFav = favoritedProducts.includes(productId);
       setFavoritedProducts((prev) =>
         isFav ? prev.filter((id) => id !== productId) : [...prev, productId]
       );
       await toggleFavorite({ productId, increment: !isFav }).unwrap();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to toggle favorite:', error);
+      setActionError(error?.data?.message || 'Failed to toggle favorite.');
     }
   };
 
   const handleChat = async (sellerId: string | Seller, productId: string) => {
+    setActionError(null); // Clear previous errors
     try {
       const sellerIdString = typeof sellerId === 'string' ? sellerId : sellerId._id;
       navigate(`/chat/${sellerIdString}`);
     } catch (error) {
       console.error('Failed to initiate chat:', error);
+      setActionError('Failed to start chat.');
     }
   };
 
   const handleViewDetails = async (productId: string) => {
+    setActionError(null); // Clear previous errors
     try {
       await incrementProductView(productId).unwrap();
       navigate(`/product/${productId}`);
     } catch (error) {
       console.error('Failed to view product details:', error);
+      setActionError('Failed to view product details.');
     }
   };
 
@@ -317,6 +317,14 @@ const { data, isLoading, isError } = useGetProductsQuery(queryParams);
           </div>
           {geocodingError && (
             <p className="text-sm text-red-500 dark:text-red-400 animate-pulse">{geocodingError}</p>
+          )}
+          {actionError && (
+            <p className="text-sm text-red-500 dark:text-red-400 animate-pulse">{actionError}</p>
+          )}
+          {isError && (
+            <p className="text-sm text-red-500 dark:text-red-400 animate-pulse">
+              {(error as any)?.data?.message || 'Failed to load products.'}
+            </p>
           )}
           {userLocation && (
             <div className="flex items-center gap-2">
@@ -445,7 +453,7 @@ const { data, isLoading, isError } = useGetProductsQuery(queryParams);
                     <ProductCard
                       key={product._id}
                       product={product}
-                      onToggleFavorite={handleToggleFavorite}
+                      onToggleFavorite={()=>handleToggleFavorite(product._id)}
                       onChat={(sellerId) => handleChat(sellerId, product._id)}
                       onViewDetails={() => handleViewDetails(product._id)}
                       isFavorited={favoritedProducts.includes(product._id)}
@@ -517,7 +525,7 @@ const { data, isLoading, isError } = useGetProductsQuery(queryParams);
               Something went wrong
             </h3>
             <p className="text-gray-500 dark:text-slate-400 max-w-md mx-auto mb-6">
-              We couldn't load the products right now. Please check your connection and try again.
+              {(error as any)?.data?.message || 'We couldn\'t load the products right now. Please check your connection and try again.'}
             </p>
             <Button
               onClick={() => window.location.reload()}

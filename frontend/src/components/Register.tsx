@@ -91,7 +91,7 @@ const Register = () => {
                 Full Name
               </Label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white" />
                 <Input
                   id="name"
                   name="name"
@@ -99,7 +99,7 @@ const Register = () => {
                   onChange={handleChange}
                   required
                   placeholder="John Doe"
-                  className="pl-9 border border-white/20 focus:border-blue-500"
+                  className="pl-9 border border-white/20 focus:border-blue-500  text-white"
                 />
               </div>
             </div>
@@ -110,7 +110,7 @@ const Register = () => {
                 Email Address
               </Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white" />
                 <Input
                   id="email"
                   name="email"
@@ -119,7 +119,7 @@ const Register = () => {
                   onChange={handleChange}
                   required
                   placeholder="email@example.com"
-                  className="pl-9 border border-white/20 focus:border-blue-500"
+                  className="pl-9 border border-white/20 focus:border-blue-500 text-white"
                 />
               </div>
             </div>
@@ -139,7 +139,7 @@ const Register = () => {
                   onChange={handleChange}
                   required
                   placeholder="••••••••"
-                  className="pl-9 pr-9 border border-white/20 focus:border-blue-500"
+                  className="pl-9 pr-9 border border-white/20 focus:border-blue-500 text-white"
                 />
                 <button
                   type="button"
@@ -166,7 +166,7 @@ const Register = () => {
                   onChange={handleChange}
                   required
                   placeholder="••••••••"
-                  className="pl-9 pr-9 border border-white/20 focus:border-blue-500"
+                  className="pl-9 pr-9 border border-white/20 focus:border-blue-500  text-white"
                 />
                 <button
                   type="button"

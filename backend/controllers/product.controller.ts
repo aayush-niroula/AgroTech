@@ -5,7 +5,8 @@ import cloudinary from "../middleware/cloudinary";
 import streamifier from "streamifier";
 import { parseCoordinates } from "../utils/parseCordinates";
 import { User } from "../models/user.model";
-
+import type { IUser } from "../models/user.model";
+import type { IProduct } from "../models/product.model";
 // Extend Express Request interface to include userId
 declare global {
   namespace Express {
@@ -370,35 +371,51 @@ export const toggleFavorite = async (req: Request, res: Response) => {
     const { increment } = req.body;
     const userId = req.userId;
 
-    if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
     if (typeof increment !== "boolean") {
       return res.status(400).json({ success: false, message: "Increment must be a boolean" });
     }
     if (!mongoose.Types.ObjectId.isValid(productId)) {
-      return res.status(400).json({ success: false, message: 'Invalid productId' });
+      return res.status(400).json({ success: false, message: "Invalid productId" });
     }
 
-    const update = increment ? { $inc: { favorites: 1 } } : { $inc: { favorites: -1 } };
+    // Update product favorite count
+    const update = increment
+      ? { $inc: { favorites: 1 } }
+      : { $inc: { favorites: -1 } };
     const updatedProduct = await Product.findByIdAndUpdate(productId, update, { new: true });
 
-    if (!updatedProduct) return res.status(404).json({ success: false, message: "Product not found" });
+    if (!updatedProduct) {
+      return res.status(404).json({ success: false, message: "Product not found" });
+    }
 
+    // Update user's favorite list
     await User.findByIdAndUpdate(userId, {
       [increment ? "$addToSet" : "$pull"]: {
         "activity.favoritedProducts": productId,
       },
     });
 
+    // Always log "favorite" but store increment separately if needed
     await UserBehavior.create({
       userId,
       productId,
-      actionType: increment ? "favorite" : "unfavorite", // FIXED: Correct actionType
+      actionType: "favorite", // ✅ Always "favorite"
     });
 
-    res.json({ success: true, message: "Favorite status updated", favorites: updatedProduct.favorites });
+    res.json({
+      success: true,
+      message: increment ? "Product favorited" : "Product unfavorited",
+      favorites: updatedProduct.favorites,
+    });
   } catch (error: any) {
     console.error("Error toggling favorite:", error);
-    res.status(500).json({ success: false, message: `Server error: ${error.message}` });
+    res.status(500).json({
+      success: false,
+      message: `Server error: ${error.message}`,
+    });
   }
 };
 
@@ -471,32 +488,155 @@ export const incrementChatCount = async (req: Request, res: Response) => {
   }
 };
 
+
 export const getPersonalizedRecommendations = async (req: Request, res: Response) => {
   try {
-    const userId = req.userId;
-    if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+    const userId = req.userId as string; // Ensure userId is typed
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
 
-    const user = await User.findById(userId).populate("activity.viewedProducts activity.favoritedProducts activity.chattedProducts");
-    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+    // Optional location params
+    const { coordinates, maxDistance } = req.query;
+    let coords: number[] | null = null;
+    let maxDist = 50000; // Default 50km
 
-    const interactedProductIds = [
-      ...user.activity.viewedProducts,
-      ...user.activity.favoritedProducts,
-      ...user.activity.chattedProducts,
-    ].map((p: any) => p._id);
+    if (coordinates) {
+      coords = parseCoordinates(coordinates as string);
+      if (!coords || coords.length !== 2) {
+        return res.status(400).json({ success: false, message: "Invalid coordinates format" });
+      }
+      maxDist = Number(maxDistance) || maxDist;
+      if (isNaN(maxDist) || maxDist <= 0) {
+        return res.status(400).json({ success: false, message: "Invalid maxDistance" });
+      }
+    }
 
-    const categories = await Product.find({ _id: { $in: interactedProductIds } }).distinct("category");
+    // Fetch user with populated fields
+    const user = await User.findById<IUser>(userId).populate([
+      { path: "activity.viewedProducts", model: "Product" },
+      { path: "activity.favoritedProducts", model: "Product" },
+      { path: "activity.chattedProducts", model: "Product" },
+    ]);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
 
-    const recommendations = await Product.aggregate([
+    // Explicitly cast product arrays
+    const viewedProducts = user.activity.viewedProducts as unknown as IProduct[];
+    const favoritedProducts = user.activity.favoritedProducts as unknown as IProduct[];
+    const chattedProducts = user.activity.chattedProducts as unknown as IProduct[];
+
+    // Collect interacted product IDs
+    const interactedProductIds = new Set<mongoose.Types.ObjectId>([
+      ...viewedProducts.map((p) => p._id as mongoose.Types.ObjectId),
+      ...favoritedProducts.map((p) => p._id as mongoose.Types.ObjectId),
+      ...chattedProducts.map((p) => p._id as mongoose.Types.ObjectId),
+    ]);
+
+    // 🔹 Fallback for no activity
+    if (interactedProductIds.size === 0) {
+      const fallbackRecs = await Product.aggregate([
+        {
+          $addFields: {
+            popularityScore: {
+              $add: [
+                { $multiply: [{ $ifNull: ["$views", 0] }, 0.1] },
+                { $multiply: [{ $ifNull: ["$favorites", 0] }, 0.3] },
+                { $multiply: [{ $ifNull: ["$chatCount", 0] }, 0.4] },
+                { $multiply: [{ $ifNull: ["$rating", 0] }, 0.2] },
+              ],
+            },
+          },
+        },
+        { $sort: { popularityScore: -1 } },
+        { $limit: 10 },
+        {
+          $lookup: {
+            from: "users",
+            localField: "sellerId",
+            foreignField: "_id",
+            as: "sellerId",
+          },
+        },
+        { $unwind: { path: "$sellerId", preserveNullAndEmptyArrays: true } },
+      ]);
+      return res.json({
+        success: true,
+        data: fallbackRecs,
+        message: "No activity yet—showing popular products",
+      });
+    }
+
+    // 🔹 Aggregate user behavior
+    const behaviorCounts = await UserBehavior.aggregate([
+      { $match: { userId: user._id, actionType: { $in: ["view", "chat"] } } },
+      {
+        $group: {
+          _id: "$productId",
+          viewCount: { $sum: { $cond: [{ $eq: ["$actionType", "view"] }, 1, 0] } },
+          chatCount: { $sum: { $cond: [{ $eq: ["$actionType", "chat"] }, 1, 0] } },
+        },
+      },
+    ]);
+
+    // Create a map of counts
+    const countsMap: Record<string, { viewCount: number; chatCount: number }> = {};
+    behaviorCounts.forEach((b) => {
+      countsMap[b._id.toString()] = { viewCount: b.viewCount, chatCount: b.chatCount };
+    });
+
+    // Fetch interacted products
+    const interactedProducts = await Product.find<IProduct>({
+      _id: { $in: Array.from(interactedProductIds) },
+    });
+
+    // 🔹 Calculate scores
+    const scoresMap: Record<string, number> = {};
+    interactedProducts.forEach((product) => {
+      const pid = (product._id as mongoose.Types.ObjectId).toString();
+      const viewCount = countsMap[pid]?.viewCount || 0;
+      const chatCount = countsMap[pid]?.chatCount || 0;
+      const isFavorited = favoritedProducts.some((p) =>
+        (p._id as mongoose.Types.ObjectId).equals(product._id as mongoose.Types.ObjectId)
+      );
+      scoresMap[pid] = viewCount * 1 + chatCount * 5 + (isFavorited ? 3 : 0);
+    });
+
+    // 🔹 Category scoring
+    const categoryScores: Record<string, number> = {};
+    const numProductsPerCategory: Record<string, number> = {};
+
+    interactedProducts.forEach((product) => {
+      const pid = (product._id as mongoose.Types.ObjectId).toString();
+      const cat = product.category;
+      const score = scoresMap[pid] || 0;
+      categoryScores[cat] = (categoryScores[cat] || 0) + score;
+      numProductsPerCategory[cat] = (numProductsPerCategory[cat] || 0) + 1;
+    });
+
+    const preferredCategories = Object.keys(categoryScores);
+    if (preferredCategories.length === 0) {
+      return res.status(200).json({ success: true, data: [], message: "No categorized activity yet" });
+    }
+
+    // 🔹 Build switch for category boost
+    const switchBranches = preferredCategories.map((cat) => ({
+      case: { $eq: ["$category", cat] },
+      then: categoryScores[cat],
+    }));
+
+    // 🔹 Recommendation pipeline
+    const pipeline: any[] = [
       {
         $match: {
-          category: { $in: categories },
-          _id: { $nin: interactedProductIds },
+          _id: { $nin: Array.from(interactedProductIds) },
+          category: { $in: preferredCategories },
         },
       },
       {
         $addFields: {
-          score: {
+          popularityScore: {
             $add: [
               { $multiply: [{ $ifNull: ["$views", 0] }, 0.1] },
               { $multiply: [{ $ifNull: ["$favorites", 0] }, 0.3] },
@@ -504,9 +644,16 @@ export const getPersonalizedRecommendations = async (req: Request, res: Response
               { $multiply: [{ $ifNull: ["$rating", 0] }, 0.2] },
             ],
           },
+          userCategoryScore: {
+            $switch: {
+              branches: switchBranches,
+              default: 0,
+            },
+          },
         },
       },
-      { $sort: { score: -1 } },
+      { $addFields: { finalScore: { $add: ["$popularityScore", "$userCategoryScore"] } } },
+      { $sort: { finalScore: -1 } },
       { $limit: 10 },
       {
         $lookup: {
@@ -516,17 +663,28 @@ export const getPersonalizedRecommendations = async (req: Request, res: Response
           as: "sellerId",
         },
       },
-      {
-        $unwind: {
-          path: "$sellerId",
-          preserveNullAndEmptyArrays: true,
-        },
-      },
-    ]);
+      { $unwind: { path: "$sellerId", preserveNullAndEmptyArrays: true } },
+    ];
 
-    res.json({ success: true, data: recommendations });
+    // 🔹 Add geo filtering
+    if (coords) {
+      pipeline.unshift({
+        $geoNear: {
+          near: { type: "Point", coordinates: [coords[0], coords[1]] },
+          distanceField: "distance",
+          spherical: true,
+          maxDistance: maxDist,
+          query: { category: { $in: preferredCategories }, _id: { $nin: Array.from(interactedProductIds) } },
+        },
+      });
+      pipeline[pipeline.length - 5] = { $sort: { finalScore: -1, distance: 1 } };
+    }
+
+    const recommendations = await Product.aggregate(pipeline);
+
+    return res.json({ success: true, data: recommendations });
   } catch (error: any) {
     console.error("Personalized recommendation error:", error);
-    res.status(500).json({ success: false, message: `Server error: ${error.message}` });
+    return res.status(500).json({ success: false, message: `Server error: ${error.message}` });
   }
 };

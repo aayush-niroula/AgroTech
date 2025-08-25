@@ -58,7 +58,7 @@ const userBehaviorSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
   actionType: {
     type: String,
-    enum: ["view", "favorite", "chat"],
+    enum: ["view", "favorite","chat"],
     required: true,
   },
   createdAt: { type: Date, default: Date.now },
