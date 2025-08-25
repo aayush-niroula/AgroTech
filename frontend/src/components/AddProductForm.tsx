@@ -5,10 +5,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { citiesOfNepal } from "@/lib/cities";
 import { useSelector } from "react-redux";
 import type { RootState } from '@/app/store';
+
+const OPENCAGE_API_KEY = 'baffb2c26c114e6994d055bfeee4afda';
+
+async function getCoords(address: string): Promise<{ lat: number; lng: number }> {
+  const url = `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(address)}&key=${OPENCAGE_API_KEY}&limit=1&countrycode=np`;
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.results.length > 0) {
+      const { lat, lng } = data.results[0].geometry;
+      return { lat, lng };
+    } else {
+      throw new Error('Location not found');
+    }
+  } catch (error) {
+    throw new Error('Failed to fetch coordinates');
+  }
+}
 
 export default function AddProductForm() {
   const [formData, setFormData] = useState({
@@ -23,8 +39,8 @@ export default function AddProductForm() {
     latitude: 0,
     longitude: 0,
   });
-
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [isGeocoding, setIsGeocoding] = useState(false);
   const user = useSelector((state: RootState) => state.auth.user);
   const [createProduct, { isLoading }] = useCreateProductMutation();
 
@@ -34,18 +50,6 @@ export default function AddProductForm() {
       ...prev,
       [name]: value,
     }));
-  };
-
-  const handleCitySelect = (cityName: string) => {
-    const selectedCity = citiesOfNepal.find((city) => city.name === cityName);
-    if (selectedCity) {
-      setFormData((prev) => ({
-        ...prev,
-        city: cityName,
-        latitude: selectedCity.latitude,
-        longitude: selectedCity.longitude,
-      }));
-    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,14 +71,39 @@ export default function AddProductForm() {
       return;
     }
 
-    const payload = {
-      ...formData,
-      price: Number(formData.price),
-      quantity: Number(formData.quantity),
-      weight: Number(formData.weight),
-      sellerId: user.id,
-      image: imageFile,
-    };
+    let latitude = formData.latitude;
+    let longitude = formData.longitude;
+
+    if (formData.city) {
+      setIsGeocoding(true);
+      try {
+        const coords = await getCoords(formData.city + ', Nepal');
+        latitude = coords.lat;
+        longitude = coords.lng;
+      } catch (error) {
+        alert("Invalid location. Please enter a valid city or address in Nepal.");
+        setIsGeocoding(false);
+        return;
+      }
+      setIsGeocoding(false);
+    } else {
+      alert("Please provide a location.");
+      return;
+    }
+
+    const payload = new FormData();
+    payload.append('title', formData.title);
+    payload.append('description', formData.description);
+    payload.append('price', formData.price);
+    payload.append('category', formData.category);
+    payload.append('brand', formData.brand);
+    payload.append('quantity', formData.quantity);
+    payload.append('weight', formData.weight);
+    payload.append('city', formData.city);
+    payload.append('latitude', latitude.toString());
+    payload.append('longitude', longitude.toString());
+    payload.append('sellerId', user.id);
+    payload.append('image', imageFile);
 
     try {
       await createProduct(payload).unwrap();
@@ -95,6 +124,8 @@ export default function AddProductForm() {
     } catch (error) {
       console.error("Error creating product:", error);
       alert("Failed to create product.");
+    } finally {
+      setIsGeocoding(false);
     }
   };
 
@@ -105,73 +136,51 @@ export default function AddProductForm() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Title */}
           <div>
             <Label>Title</Label>
             <Input name="title" value={formData.title} onChange={handleChange} required />
           </div>
-
-          {/* Description */}
           <div>
             <Label>Description</Label>
             <Textarea name="description" value={formData.description} onChange={handleChange} required />
           </div>
-
-          {/* Price */}
           <div>
             <Label>Price (NPR)</Label>
             <Input name="price" type="number" value={formData.price} onChange={handleChange} required />
           </div>
-
-          {/* Category */}
           <div>
             <Label>Category</Label>
             <Input name="category" value={formData.category} onChange={handleChange} required />
           </div>
-
-          {/* Brand */}
           <div>
             <Label>Brand</Label>
             <Input name="brand" value={formData.brand} onChange={handleChange} required />
           </div>
-
-          {/* Quantity */}
           <div>
             <Label>Quantity</Label>
             <Input name="quantity" type="number" value={formData.quantity} onChange={handleChange} required />
           </div>
-
-          {/* Weight */}
           <div>
             <Label>Weight (kg)</Label>
             <Input name="weight" type="number" value={formData.weight} onChange={handleChange} required />
           </div>
-
-          {/* City Selector */}
           <div>
-            <Label>Location (City)</Label>
-            <Select onValueChange={handleCitySelect} value={formData.city}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a city" />
-              </SelectTrigger>
-              <SelectContent>
-                {citiesOfNepal.map((city) => (
-                  <SelectItem key={city.name} value={city.name}>
-                    {city.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>Location (City or Address)</Label>
+            <Input
+              name="city"
+              value={formData.city}
+              onChange={handleChange}
+              required
+              placeholder="e.g., Kathmandu, Nepal"
+              disabled={isGeocoding}
+            />
           </div>
-
-          {/* Image Upload */}
           <div>
             <Label>Product Image</Label>
             <Input type="file" accept="image/*" onChange={handleFileChange} required />
           </div>
-
-          <Button type="submit" disabled={isLoading} className="w-full">
-            {isLoading ? "Creating..." : "Add Product"}
+          <Button type="submit" disabled={isLoading || isGeocoding} className="w-full">
+            {isLoading || isGeocoding ? "Processing..." : "Add Product"}
           </Button>
         </form>
       </CardContent>

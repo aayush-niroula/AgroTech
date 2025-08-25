@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   useGetProductByIdQuery,
   useIncrementProductViewMutation,
-  useToggleChatCountMutation,
+  
 } from "@/services/productApi";
 import { MessageCircle, Phone, Star } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -21,7 +21,7 @@ export default function ProductDetailPage() {
     isError,
   } = useGetProductByIdQuery(productId || "");
   const [incrementView] = useIncrementProductViewMutation();
-  const [incrementChatCount] = useToggleChatCountMutation();
+
 
   // Unwrap product from response safely
   const product: IProduct | undefined = response?.data;
@@ -51,7 +51,7 @@ export default function ProductDetailPage() {
   };
   const handleChatClick = async () => {
     if (!product) return;
-    await incrementChatCount(product._id).unwrap();
+  
     const sellerId =
       typeof product.sellerId === "string"
         ? product.sellerId

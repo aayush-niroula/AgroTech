@@ -1,56 +1,45 @@
-import type { ApiResponse, IProduct } from "@/types/product";
 import { api } from "./api";
+import type { ApiResponse, IProduct } from "@/types/product";
 
 export const productApi = api.injectEndpoints({
   endpoints: (builder) => ({
-    createProduct: builder.mutation<
-      IProduct,
-      Partial<IProduct> & { latitude: number; longitude: number }
-    >({
-      query: (data) => {
-        const formData = new FormData();
-        Object.entries(data).forEach(([key, value]) => {
-          if (value !== undefined && value !== null) {
-            formData.append(key, value as any);
-          }
-        });
-        return {
-          url: "/products/",
-          method: "POST",
-          body: formData,
-        };
-      },
+    // ✅ Create Product
+    createProduct: builder.mutation<IProduct, FormData>({
+      query: (formData) => ({
+        url: "/products",
+        method: "POST",
+        body: formData,
+      }),
       invalidatesTags: ["Product"],
     }),
 
+    // ✅ Get All Products
+    getAllProducts: builder.query<ApiResponse<IProduct[]>, void>({
+      query: () => "/products",
+      providesTags: ["Product"],
+    }),
+
+    // ✅ Get Products with Filters/Location
     getProducts: builder.query<
       ApiResponse<IProduct[]>,
-      {
-        category?: string;
-        brand?: string;
-        coordinates?: string;
-        maxDistance?: number;
-      } | void
+      { category?: string; brand?: string; coordinates?: string; maxDistance?: number }
     >({
       query: (params) => {
-        const query = params
-          ? "?" +
-            new URLSearchParams(
-              Object.entries(params).reduce((acc, [key, value]) => {
-                if (value !== undefined) acc[key] = String(value);
-                return acc;
-              }, {} as Record<string, string>)
-            ).toString()
-          : "";
+        const query = new URLSearchParams();
+        if (params?.category) query.set("category", params.category);
+        if (params?.brand) query.set("brand", params.brand);
+        if (params?.coordinates) query.set("coordinates", params.coordinates);
+        if (params?.maxDistance) query.set("maxDistance", params.maxDistance.toString());
+
         return {
-          url: `/products${query}`,
+          url: `/products/search${query.toString() ? `?${query.toString()}` : ""}`,
           method: "GET",
         };
       },
       providesTags: ["Product"],
     }),
 
-    // ✅ Get Single Product by ID
+    // ✅ Get Product by ID
     getProductById: builder.query<ApiResponse<IProduct>, string>({
       query: (id) => `/products/${id}`,
       providesTags: ["Product"],
@@ -59,10 +48,7 @@ export const productApi = api.injectEndpoints({
     // ✅ Update Product
     updateProduct: builder.mutation<
       IProduct,
-      {
-        id: string;
-        data: Partial<IProduct> & { latitude?: number; longitude?: number };
-      }
+      { id: string; data: Partial<IProduct> }
     >({
       query: ({ id, data }) => ({
         url: `/products/${id}`,
@@ -81,7 +67,7 @@ export const productApi = api.injectEndpoints({
       invalidatesTags: ["Product"],
     }),
 
-    // ✅ Get Recommended Products
+    // ✅ Get Recommendations for a Product
     getRecommendedProducts: builder.query<
       IProduct[],
       { productId: string; coordinates: string }
@@ -91,6 +77,7 @@ export const productApi = api.injectEndpoints({
       providesTags: ["Product"],
     }),
 
+    // ✅ Increment Product View
     incrementProductView: builder.mutation<{ message: string }, string>({
       query: (productId) => ({
         url: `/products/${productId}/view`,
@@ -99,8 +86,9 @@ export const productApi = api.injectEndpoints({
       invalidatesTags: ["Product"],
     }),
 
+    // ✅ Toggle Favorite
     toggleFavorite: builder.mutation<
-      { message: string },
+      { message: string; favorites?: number },
       { productId: string; increment: boolean }
     >({
       query: ({ productId, increment }) => ({
@@ -110,32 +98,37 @@ export const productApi = api.injectEndpoints({
       }),
       invalidatesTags: ["Product"],
     }),
-    incrementProductInterest: builder.mutation<{ message: string }, string>({
-      query: (productId) => ({
-        url: `/products/${productId}/interest`,
-        method: "POST",
-      }),
-      invalidatesTags: ["Product"],
-    }),
-    toggleChatCount: builder.mutation<{ message: string }, string>({
+
+    // ✅ Increment Chat Count
+    incrementChatCount: builder.mutation<{ message: string }, string>({
       query: (productId) => ({
         url: `/products/${productId}/chatCount`,
         method: "POST",
       }),
       invalidatesTags: ["Product"],
     }),
-    getBehaviorRecommendations: builder.query<IProduct[], { userId: string }>({
-      query: ({ userId }) =>
-        `/products/recommendations/behavior?userId=${userId}`,
+
+    // ✅ Record Product View Behavior
+    recordViewBehavior: builder.mutation<{ message: string }, string>({
+      query: (productId) => ({
+        url: `/products/${productId}/record-view`,
+        method: "POST",
+      }),
+      invalidatesTags: ["Product"],
+    }),
+
+    // ✅ Get Personalized Recommendations
+    getPersonalizedRecommendations: builder.query<ApiResponse<IProduct[]>, void>({
+      query: () => "/products/personalized",
       providesTags: ["Product"],
     }),
   }),
-
   overrideExisting: false,
 });
 
 export const {
   useCreateProductMutation,
+  useGetAllProductsQuery,
   useGetProductsQuery,
   useGetProductByIdQuery,
   useUpdateProductMutation,
@@ -143,7 +136,7 @@ export const {
   useGetRecommendedProductsQuery,
   useIncrementProductViewMutation,
   useToggleFavoriteMutation,
-  useIncrementProductInterestMutation,
-  useToggleChatCountMutation,
-  useGetBehaviorRecommendationsQuery
+  useIncrementChatCountMutation,
+  useRecordViewBehaviorMutation,
+  useGetPersonalizedRecommendationsQuery,
 } = productApi;

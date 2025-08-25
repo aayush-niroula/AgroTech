@@ -12,6 +12,11 @@ export interface IUser extends Document {
   resetTokenExpiry?: Date;
   createdAt: Date;
   updatedAt: Date;
+  activity: {
+    viewedProducts: mongoose.Types.ObjectId[];
+    favoritedProducts: mongoose.Types.ObjectId[];
+    chattedProducts: mongoose.Types.ObjectId[];
+  };
 }
 
 const userSchema = new Schema<IUser>(
@@ -24,6 +29,11 @@ const userSchema = new Schema<IUser>(
     googleId: { type: String },
     resetToken: { type: String },
     resetTokenExpiry: { type: Date },
+    activity: {
+      viewedProducts: [{ type: Schema.Types.ObjectId, ref: "Product" }],
+      favoritedProducts: [{ type: Schema.Types.ObjectId, ref: "Product" }],
+      chattedProducts: [{ type: Schema.Types.ObjectId, ref: "Product" }],
+    },
   },
   { timestamps: true }
 );
