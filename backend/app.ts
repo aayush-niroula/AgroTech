@@ -11,6 +11,7 @@ import chatRoutes from "./routes/chat.routes";
 import { Conversation, Message } from "./models/chat.model";
 import notificationRoutes from "./routes/notification.routes";
 import { setupSocketIO } from "./utils/socketService";
+import { reviewRoutes } from "./routes/review.routes";
 
 dotenv.config();
 const app = express();
@@ -33,6 +34,7 @@ app.use("/api/products", productRoutes);
 app.use("/uploads", express.static("uploads"));
 app.use("/api/chat", chatRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/review",reviewRoutes)
 
 dbConnection();
 

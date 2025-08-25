@@ -129,15 +129,23 @@ export default function MarketplacePage() {
   }, [trackLocation]);
 
   // Fetch products
-  const { data, isLoading, isError } = useGetProductsQuery({
-    category: selectedCategory || undefined,
-    coordinates: userLocation ? `${userLocation[0]},${userLocation[1]}` : undefined,
-    maxDistance: userLocation ? radius * 1000 : undefined,
-  });
+  
+  const queryParams: any = {};
+if (selectedCategory) queryParams.category = selectedCategory;
+if (trackLocation || locationQuery) {
+  if (userLocation) {
+    queryParams.coordinates = `${userLocation[0]},${userLocation[1]}`;
+    queryParams.maxDistance = radius * 1000;
+  }
+}
+
+const { data, isLoading, isError } = useGetProductsQuery(queryParams);
+
+  
 
   const productList: IProduct[] = (data as ApiResponse<IProduct[]> | undefined)?.data ?? [];
 
-  // Unique categories
+  
   const categories = useMemo(
     () => Array.from(new Set(productList.map((p) => p.category).filter(Boolean))),
     [productList]

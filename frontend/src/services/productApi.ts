@@ -108,7 +108,7 @@ export const productApi = api.injectEndpoints({
       invalidatesTags: ["Product"],
     }),
 
-    // ✅ Record Product View Behavior
+    
     recordViewBehavior: builder.mutation<{ message: string }, string>({
       query: (productId) => ({
         url: `/products/${productId}/record-view`,
@@ -117,7 +117,7 @@ export const productApi = api.injectEndpoints({
       invalidatesTags: ["Product"],
     }),
 
-    // ✅ Get Personalized Recommendations
+   
     getPersonalizedRecommendations: builder.query<ApiResponse<IProduct[]>, void>({
       query: () => "/products/personalized",
       providesTags: ["Product"],

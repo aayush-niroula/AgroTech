@@ -20,6 +20,7 @@ export interface IProduct extends Document {
   rating: number; 
   createdAt: Date;
   updatedAt: Date;
+  reviewCount:number;
 }
 
 const productSchema = new mongoose.Schema<IProduct>({
@@ -46,7 +47,7 @@ const productSchema = new mongoose.Schema<IProduct>({
   favorites: { type: Number, default: 0 },     // How many times it's favorited
   chatCount: { type: Number, default: 0 },     // Number of sales
   rating: { type: Number, default: 0 },        // Average rating from reviews
-
+  reviewCount:{type:Number,default:0},
   sellerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
 }, {
   timestamps: true,
