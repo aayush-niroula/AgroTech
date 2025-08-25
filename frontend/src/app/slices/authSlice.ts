@@ -6,8 +6,10 @@ export interface User {
     name: string;
     email: string;
     isAdmin: boolean;
+    avatarUrl?:string;
     createdAt: string;
     updatedAt: string;
+
 }
 
 interface AuthState {

@@ -34,6 +34,7 @@ export interface IProduct {
   createdAt: string;
   views: number;
   weight: number;
+  reviewCount:number;
   __v: number;
 }
 

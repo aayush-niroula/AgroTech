@@ -3,6 +3,10 @@ import { User } from "../models/user.model";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
+import cloudinary from "../middleware/cloudinary";
+import mongoose from "mongoose";
+import { AuthenticatedRequest } from "../middleware/authMiddleware";
+import { Product } from "../models/product.model";
 
 export const registerUser = async (req: Request, res: Response) => {
   try {
@@ -280,5 +284,105 @@ export const forgotPassword = async (req: Request, res: Response) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const updateUserProfile = async (req: Request, res: Response) => {
+  try {
+    const userId = req.userId;
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
+
+    const { name, email } = req.body;
+    const user = await User.findById(userId);
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (name) user.name = name;
+    if (email) user.email = email;
+
+    if (req.file && req.file.buffer) {
+      const uploadToCloudinary = (buffer: Buffer, publicId: string) => {
+        return new Promise<string>((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            { folder: "avatars", resource_type: "image", public_id: publicId, overwrite: true },
+            (error, result) => {
+              if (error) return reject(error);
+              resolve(result?.secure_url || "");
+            }
+          );
+          stream.end(buffer);
+        });
+      };
+
+      const publicId = `${userId}_${Date.now()}`;
+      const avatarUrl = await uploadToCloudinary(req.file.buffer, publicId);
+      user.avatarUrl = avatarUrl;
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      message: "Profile updated successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        avatarUrl: user.avatarUrl,
+        isAdmin: user.isAdmin,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// ----------------- RESET PASSWORD -----------------
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const userId  = req.userId;
+    const { currentPassword, newPassword } = req.body;
+     console.log(userId);
+     
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Verify current password
+    const isMatch = await bcrypt.compare(currentPassword, user.password || "");
+    if (!isMatch) return res.status(401).json({ message: "Current password is incorrect" });
+
+    user.password = newPassword; // will be hashed in pre-save hook
+    await user.save();
+
+    res.status(200).json({ message: "Password updated successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// ----------------- GET USER PRODUCTS -----------------
+export const getUserProducts = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.userId;
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
+
+    // Fetch all products where this user is the seller
+    const products = await Product.find({ sellerId: userId }).populate("sellerId");
+
+    res.status(200).json({
+      success: true,
+      data: products,
+      message: products.length > 0 ? "User products fetched successfully" : "No products found",
+    });
+  } catch (error) {
+    console.error("getUserProducts error:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };

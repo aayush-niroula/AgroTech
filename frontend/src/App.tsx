@@ -14,6 +14,7 @@ import AddProductForm from './components/AddProductForm'
 import ProductDetailPage from './Pages/ProductDetailsPage'
 import ChatPage from './Pages/ChatPage'
 import Inbox from './components/Inbox'
+import { ProfileSettings } from './Pages/ProfileSetting'
 
 
 const App = () => {
@@ -29,6 +30,7 @@ const App = () => {
         <Route path='/product/:productId' element={<ProductDetailPage/>}/>
         <Route path='chat/:sellerId' element={<ChatPage/>}/>
         <Route path="/seller/inbox" element={<Inbox />} />
+        <Route path='/profile' element={<ProfileSettings/>}/>
       </Route>
 
       {/* Auth Pages (no Navbar) */}

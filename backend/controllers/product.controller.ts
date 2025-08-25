@@ -84,7 +84,10 @@ export const createProduct = async (req: Request, res: Response) => {
 
     const savedProduct = await newProduct.save();
     await savedProduct.populate("sellerId");
-
+   
+    await User.findByIdAndUpdate(sellerId, {
+      $addToSet: { addedProducts: savedProduct._id },
+    });
     res.status(201).json({ success: true, data: savedProduct });
   } catch (error: any) {
     console.error('Error creating product:', error);

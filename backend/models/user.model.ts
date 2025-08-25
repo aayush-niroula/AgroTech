@@ -17,6 +17,7 @@ export interface IUser extends Document {
     favoritedProducts: mongoose.Types.ObjectId[];
     chattedProducts: mongoose.Types.ObjectId[];
   };
+  addedProducts?:mongoose.Types.ObjectId[],
 }
 
 const userSchema = new Schema<IUser>(
@@ -34,7 +35,9 @@ const userSchema = new Schema<IUser>(
       favoritedProducts: [{ type: Schema.Types.ObjectId, ref: "Product" }],
       chattedProducts: [{ type: Schema.Types.ObjectId, ref: "Product" }],
     },
+    addedProducts: [{ type: Schema.Types.ObjectId, ref: "Product" }],
   },
+  
   { timestamps: true }
 );
 

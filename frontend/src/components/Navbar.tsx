@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Leaf, Menu, X, Sun, Moon, Bell } from "lucide-react";
+import { Leaf, Menu, X, Sun, Moon, Bell, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDispatch, useSelector } from "react-redux";
 import { type RootState } from "@/app/store";
@@ -45,20 +45,27 @@ const NotificationItem = ({
   return (
     <DropdownMenuItem
       onClick={() => onClick(notification)}
-      className={`flex flex-col items-start ${notification.isRead ? "" : "font-semibold"}`}
+      className={`flex flex-col items-start p-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${
+        notification.isRead ? "" : "bg-blue-50 dark:bg-blue-900/20 border-l-2 border-l-blue-500"
+      }`}
     >
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-2 w-full">
         <Avatar className="w-6 h-6">
-          <AvatarFallback>
+          <AvatarFallback className="text-xs">
             {isSenderLoading ? "..." : sender?.name?.charAt(0) || "U"}
           </AvatarFallback>
         </Avatar>
-        <span>{isSenderLoading ? "Loading..." : sender?.name || "Unknown"}</span>
+        <span className="font-medium text-sm">
+          {isSenderLoading ? "Loading..." : sender?.name || "Unknown"}
+        </span>
+        {!notification.isRead && (
+          <div className="w-2 h-2 bg-blue-500 rounded-full ml-auto" />
+        )}
       </div>
-      <p className="text-sm text-gray-500 truncate w-full">
+      <p className="text-sm text-gray-600 dark:text-gray-400 truncate w-full mt-1">
         {notification.text}
       </p>
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
         {new Date(notification.createdAt).toLocaleTimeString()}
       </p>
     </DropdownMenuItem>
@@ -134,11 +141,12 @@ export const Navbar = () => {
       transition={{ duration: 0.6, ease: "easeOut" }}
     >
       <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+        {/* Logo */}
         <div
           onClick={() => navigate("/")}
-          className="flex items-center space-x-2 cursor-pointer"
+          className="flex items-center space-x-2 cursor-pointer group"
         >
-          <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg">
+          <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow duration-300">
             <Leaf className="w-5 h-5 text-white" />
           </div>
           <span className="text-xl font-bold text-gray-800 dark:text-white">
@@ -146,56 +154,98 @@ export const Navbar = () => {
           </span>
         </div>
 
-        <nav className="hidden md:flex items-center space-x-6">
+        {/* Desktop Navigation */}
+        <nav className="hidden md:flex items-center space-x-8">
           {[
             { href: "/features", label: "Features" },
             { href: "/marketplace", label: "Marketplace" },
-            { href: "/how-it-works", label: "How it Works" },
-            { href: "/contact", label: "Contact" },
-            { href: "/createproduct", label: "Add product" },
+            { href: "/createproduct", label: "Sell Products" },
+            { 
+              href: "/seller/inbox", 
+              label: "Inbox",
+              hasNotification: unreadCount > 0,
+              notificationCount: unreadCount
+            },
           ].map((link) => (
             <a
               key={link.href}
               href={link.href}
-              className={`text-sm font-medium hover:text-green-600 dark:hover:text-green-400 ${
+              className={`relative text-sm font-medium transition-colors duration-200 hover:text-green-600 dark:hover:text-green-400 flex items-center space-x-1 ${
                 location.pathname === link.href
                   ? "text-green-600 dark:text-green-400"
                   : "text-gray-600 dark:text-gray-300"
               }`}
             >
-              {link.label}
+              <span>{link.label}</span>
+              {link.hasNotification && (
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold ml-1"
+                >
+                  {link.notificationCount > 9 ? '9+' : link.notificationCount}
+                </motion.div>
+              )}
             </a>
           ))}
         </nav>
 
-        <div className="flex items-center space-x-4">
-          <Button variant="ghost" onClick={toggleTheme} size="icon">
+        {/* Right side controls */}
+        <div className="flex items-center space-x-2">
+          {/* Theme Toggle */}
+          <Button 
+            variant="ghost" 
+            onClick={toggleTheme} 
+            size="icon"
+            className="hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
             {isDark ? (
-              <Sun className="w-5 h-5" />
+              <Sun className="w-5 h-5 text-yellow-500" />
             ) : (
-              <Moon className="w-5 h-5" />
+              <Moon className="w-5 h-5 text-gray-600" />
             )}
           </Button>
 
+
+
+          {/* Notifications */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="relative hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
                 <Bell className="w-5 h-5" />
                 {unreadCount > 0 && (
-                  <span className="absolute top-0 right-0 inline-block w-3 h-3 bg-red-500 rounded-full" />
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"
+                  />
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-80">
-              <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+            <DropdownMenuContent className="w-80 max-h-96 overflow-y-auto">
+              <DropdownMenuLabel className="flex items-center justify-between">
+                <span>Notifications</span>
+                {unreadCount > 0 && (
+                  <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
+                    {unreadCount}
+                  </span>
+                )}
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
               {isLoading ? (
-                <DropdownMenuItem className="text-gray-500">
+                <DropdownMenuItem className="text-gray-500 text-center py-4">
                   Loading notifications...
                 </DropdownMenuItem>
               ) : notifications.length === 0 ? (
-                <DropdownMenuItem className="text-gray-500">
-                  No notifications
+                <DropdownMenuItem className="text-gray-500 text-center py-8">
+                  <div className="flex flex-col items-center space-y-2">
+                    <Bell className="w-8 h-8 text-gray-300" />
+                    <span>No notifications</span>
+                  </div>
                 </DropdownMenuItem>
               ) : (
                 notifications.slice(0, 5).map((notification) => (
@@ -206,48 +256,68 @@ export const Navbar = () => {
                   />
                 ))
               )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate("/seller/inbox")}>
-                View All Notifications
-              </DropdownMenuItem>
+              {notifications.length > 5 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={() => navigate("/seller/inbox")}
+                    className="text-center text-green-600 dark:text-green-400 font-medium hover:bg-green-50 dark:hover:bg-green-900/20"
+                  >
+                    View All Notifications
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
+          {/* User Profile */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Avatar className="cursor-pointer ring-2 ring-green-600/20">
-                <AvatarFallback>{user?.name?.charAt(0) ?? "U"}</AvatarFallback>
+              <Avatar className="cursor-pointer ring-2 ring-green-500/20 hover:ring-green-500/40 transition-all duration-200 shadow-md hover:shadow-lg">
+                <AvatarFallback className="bg-gradient-to-br from-green-400 to-green-600 text-white font-semibold">
+                  {user?.name?.charAt(0) ?? "U"}
+                </AvatarFallback>
               </Avatar>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56">
-              <DropdownMenuLabel>
-                <div>{user?.name}</div>
-                <div className="text-xs text-muted-foreground">
-                  {user?.email}
+              <DropdownMenuLabel className="pb-3">
+                <div className="flex flex-col space-y-1">
+                  <div className="font-semibold text-gray-900 dark:text-gray-100">
+                    {user?.name}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    {user?.email}
+                  </div>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate("/profile")}>
+              <DropdownMenuItem 
+                onClick={() => navigate("/profile")}
+                className="hover:bg-gray-50 dark:hover:bg-gray-800"
+              >
                 Profile
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate("/seller/inbox")}>
-                📬 Inbox
-                {unreadCount > 0 && (
-                  <span className="ml-2 inline-block w-3 h-3 bg-red-500 rounded-full" />
-                )}
+              <DropdownMenuItem 
+                onClick={() => navigate("/settings")}
+                className="hover:bg-gray-50 dark:hover:bg-gray-800"
+              >
+                Settings
               </DropdownMenuItem>
-              <DropdownMenuItem>Settings</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="text-red-500">
+              <DropdownMenuItem 
+                onClick={handleLogout} 
+                className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+              >
                 Logout
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
+          {/* Mobile Menu Toggle */}
           <Button
             variant="ghost"
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="md:hidden"
+            className="md:hidden hover:bg-gray-100 dark:hover:bg-gray-800"
             size="icon"
           >
             {mobileOpen ? (
@@ -259,34 +329,47 @@ export const Navbar = () => {
         </div>
       </div>
 
+      {/* Mobile Menu */}
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
-            initial={{ y: -20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -20, opacity: 0 }}
-            className="md:hidden bg-white dark:bg-gray-900 px-6 py-4 border-t dark:border-gray-800 space-y-4"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="md:hidden bg-white dark:bg-gray-900 border-t dark:border-gray-800 shadow-lg overflow-hidden"
           >
-            {[
-              { href: "/features", label: "Features" },
-              { href: "/marketplace", label: "Marketplace" },
-              { href: "/how-it-works", label: "How it Works" },
-              { href: "/contact", label: "Contact" },
-              { href: "/createproduct", label: "Add product" },
-            ].map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                onClick={() => setMobileOpen(false)}
-                className={`block text-base font-medium hover:text-green-600 dark:hover:text-green-400 ${
-                  location.pathname === link.href
-                    ? "text-green-600 dark:text-green-400"
-                    : "text-gray-600 dark:text-gray-300"
-                }`}
-              >
-                {link.label}
-              </a>
-            ))}
+            <div className="px-6 py-4 space-y-4">
+              {[
+                { href: "/features", label: "Features" },
+                { href: "/marketplace", label: "Marketplace" },
+                { href: "/createproduct", label: "Sell Products" },
+                { 
+                  href: "/seller/inbox", 
+                  label: "Inbox",
+                  hasNotification: unreadCount > 0,
+                  notificationCount: unreadCount
+                },
+              ].map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setMobileOpen(false)}
+                  className={`flex items-center justify-between text-base font-medium py-2 px-3 rounded-lg transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-green-600 dark:hover:text-green-400 ${
+                    location.pathname === link.href
+                      ? "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20"
+                      : "text-gray-600 dark:text-gray-300"
+                  }`}
+                >
+                  <span>{link.label}</span>
+                  {link.hasNotification && (
+                    <div className="w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                      {link.notificationCount > 9 ? '9+' : link.notificationCount}
+                    </div>
+                  )}
+                </a>
+              ))}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
