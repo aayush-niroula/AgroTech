@@ -48,7 +48,7 @@ interface FormStep {
   color: string;
 }
 
-const categories = ["Animals", "Crops", "Fertilizer", "Seeds", "Equipment","Unknown"];
+const categories = ["Animals", "Crops", "Fertilizer", "Seeds", "Equipment", "Unknown"];
 
 async function getCoords(address: string): Promise<Coordinates> {
   const url = `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(address)}&key=${OPENCAGE_API_KEY}&limit=1&countrycode=np`;
@@ -177,11 +177,13 @@ export default function AddProductForm() {
   const currentStepData = formSteps[currentStep];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 py-8 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
-      <div className="fixed inset-0 opacity-5 dark:opacity-10 pointer-events-none" style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000' fill-opacity='0.03'%3E%3Cpath d='m36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-        backgroundSize: '60px 60px',
-      }} />
+    <div className="min-h-screen bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:via-purple-900 dark:to-slate-900 py-8 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-4 left-4 w-2 h-2 bg-blue-400 rounded-full animate-ping opacity-60" style={{ animationDelay: '0s', animationDuration: '2s' }}></div>
+        <div className="absolute top-8 right-6 w-1 h-1 bg-purple-400 rounded-full animate-ping opacity-60" style={{ animationDelay: '1s', animationDuration: '2s' }}></div>
+        <div className="absolute bottom-6 left-8 w-1.5 h-1.5 bg-blue-300 rounded-full animate-ping opacity-60" style={{ animationDelay: '0.5s', animationDuration: '2s' }}></div>
+        <div className="absolute bottom-4 right-4 w-2 h-2 bg-purple-300 rounded-full animate-ping opacity-60" style={{ animationDelay: '1.5s', animationDuration: '2s' }}></div>
+      </div>
 
       <motion.div className="w-full max-w-3xl relative z-10" variants={containerVariants} initial="hidden" animate="visible">
         <motion.div className="text-center mb-8" variants={itemVariants}>
@@ -189,8 +191,8 @@ export default function AddProductForm() {
             <Sparkles className="w-5 h-5" />
             <span className="font-semibold">Create New Product</span>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100 mb-2">Add Your Product</h1>
-          <p className="text-gray-600 dark:text-slate-400">Share your agricultural products with the community</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Add Your Product</h1>
+          <p className="text-gray-600 dark:text-slate-300">Share your agricultural products with the community</p>
         </motion.div>
 
         <motion.div className="flex justify-center mb-8" variants={itemVariants}>
@@ -231,285 +233,388 @@ export default function AddProductForm() {
         </motion.div>
 
         <motion.div variants={itemVariants}>
-          <Card className="backdrop-blur-lg bg-white/80 dark:bg-slate-800/80 border-0 shadow-2xl dark:shadow-slate-900/50 rounded-xl">
-            <div className={`bg-gradient-to-r ${currentStepData.color} text-white rounded-t-xl p-6`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <currentStepData.icon className="w-7 h-7 sm:w-8 sm:h-8" />
-                  <h2 className="text-xl sm:text-2xl font-semibold">{currentStepData.title}</h2>
+          <div className="relative snake-border">
+            <Card className="backdrop-blur-lg bg-white dark:bg-gradient-to-br dark:from-slate-800/90 dark:to-slate-900/90 border-transparent shadow-2xl transform-gpu rounded-xl"
+              style={{
+                transform: 'perspective(1000px) rotateX(2deg)',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.1) dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.1),inset_0_1px_0_rgba(255,255,255,0.1)]'
+              }}>
+              <div className={`bg-gradient-to-r ${currentStepData.color} text-white rounded-t-xl p-6`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <currentStepData.icon className="w-7 h-7 sm:w-8 sm:h-8" />
+                    <h2 className="text-xl sm:text-2xl font-semibold">{currentStepData.title}</h2>
+                  </div>
+                  <Badge variant="secondary" className="bg-white/20 text-white px-3 py-1 rounded-full text-sm">
+                    Step {currentStep + 1} of {formSteps.length}
+                  </Badge>
                 </div>
-                <Badge variant="secondary" className="bg-white/20 text-white px-3 py-1 rounded-full text-sm">
-                  Step {currentStep + 1} of {formSteps.length}
-                </Badge>
               </div>
-            </div>
-            <div className="p-6 sm:p-8">
-              <form onSubmit={handleSubmit}>
-                <motion.div className="space-y-6" key={currentStep} initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4 }}>
-                  {currentStep === 0 && (
-                    <>
-                      <motion.div variants={itemVariants} className="group">
-                        <Label className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2 flex items-center gap-2">
-                          <Package className="w-4 h-4" /> Product Title
-                        </Label>
-                        <div className="relative">
-                          <Input
-                            name="title"
-                            value={formData.title}
-                            onChange={handleChange}
-                            required
-                            className="w-full h-12 px-4 bg-white dark:bg-slate-700 border-2 border-gray-200 dark:border-slate-600 focus:border-blue-500 dark:focus:border-blue-400 rounded-lg transition-all duration-300 group-hover:border-blue-300"
-                            placeholder="Enter product title..."
-                          />
-                          {completedFields.has('title') && <CheckCircle className="absolute right-3 top-3 w-6 h-6 text-green-500" />}
-                        </div>
-                      </motion.div>
-
-                      <motion.div variants={itemVariants} className="group">
-                        <Label className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">Description</Label>
-                        <div className="relative">
-                          <Textarea
-                            name="description"
-                            value={formData.description}
-                            onChange={handleChange}
-                            required
-                            className="w-full min-h-[120px] p-4 bg-white dark:bg-slate-700 border-2 border-gray-200 dark:border-slate-600 focus:border-blue-500 dark:focus:border-blue-400 rounded-lg transition-all duration-300 group-hover:border-blue-300"
-                            placeholder="Describe your product..."
-                          />
-                          {completedFields.has('description') && <CheckCircle className="absolute right-3 top-3 w-6 h-6 text-green-500" />}
-                        </div>
-                      </motion.div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+              <div className="p-6 sm:p-8">
+                <form onSubmit={handleSubmit}>
+                  <motion.div className="space-y-6" key={currentStep} initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4 }}>
+                    {currentStep === 0 && (
+                      <>
                         <motion.div variants={itemVariants} className="group">
                           <Label className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2 flex items-center gap-2">
-                            <Tag className="w-4 h-4" /> Category
+                            <Package className="w-4 h-4" /> Product Title
                           </Label>
                           <div className="relative">
-                            <select
-                              name="category"
-                              value={formData.category}
+                            <Input
+                              name="title"
+                              value={formData.title}
                               onChange={handleChange}
                               required
-                              className="w-full h-12 px-4 bg-white dark:bg-slate-700 border-2 border-gray-200 dark:border-slate-600 focus:border-blue-500 dark:focus:border-blue-400 rounded-lg transition-all duration-300 group-hover:border-blue-300 appearance-none"
-                            >
-                              <option value="" disabled>Select a category</option>
-                              {categories.map((category) => (
-                                <option key={category} value={category}>{category}</option>
-                              ))}
-                            </select>
-                            {completedFields.has('category') && <CheckCircle className="absolute right-3 top-3 w-6 h-6 text-green-500" />}
+                              className="w-full h-12 px-4 bg-gray-100/50 dark:bg-slate-700/50 border border-gray-300 dark:border-slate-600/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-400 backdrop-blur-sm transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 focus:bg-gray-100/70 dark:focus:bg-slate-700/70 hover:bg-gray-100/60 dark:hover:bg-slate-700/60"
+                              placeholder="Enter product title..."
+                              style={{
+                                boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05) dark:inset-[0_2px_4px_rgba(0,0,0,0.3),0_1px_2px_rgba(255,255,255,0.1)]'
+                              }}
+                            />
+                            {completedFields.has('title') && <CheckCircle className="absolute right-3 top-3 w-6 h-6 text-green-500" />}
                           </div>
                         </motion.div>
 
                         <motion.div variants={itemVariants} className="group">
-                          <Label className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">Brand</Label>
+                          <Label className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">Description</Label>
                           <div className="relative">
-                            <Input
-                              name="brand"
-                              value={formData.brand}
+                            <Textarea
+                              name="description"
+                              value={formData.description}
                               onChange={handleChange}
                               required
-                              className="w-full h-12 px-4 bg-white dark:bg-slate-700 border-2 border-gray-200 dark:border-slate-600 focus:border-blue-500 dark:focus:border-blue-400 rounded-lg transition-all duration-300 group-hover:border-blue-300"
-                              placeholder="Brand name..."
+                              className="w-full min-h-[120px] p-4 bg-gray-100/50 dark:bg-slate-700/50 border border-gray-300 dark:border-slate-600/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-400 backdrop-blur-sm transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 focus:bg-gray-100/70 dark:focus:bg-slate-700/70 hover:bg-gray-100/60 dark:hover:bg-slate-700/60"
+                              placeholder="Describe your product..."
+                              style={{
+                                boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05) dark:inset-[0_2px_4px_rgba(0,0,0,0.3),0_1px_2px_rgba(255,255,255,0.1)]'
+                              }}
                             />
-                            {completedFields.has('brand') && <CheckCircle className="absolute right-3 top-3 w-6 h-6 text-green-500" />}
+                            {completedFields.has('description') && <CheckCircle className="absolute right-3 top-3 w-6 h-6 text-green-500" />}
                           </div>
                         </motion.div>
-                      </div>
-                    </>
-                  )}
-
-                  {currentStep === 1 && (
-                    <>
-                      <div className="space-y-6">
-                        <div className="group">
-                          <Label className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-3 flex items-center gap-2">
-                            <DollarSign className="w-5 h-5" /> Price (NPR)
-                          </Label>
-                          <div className="relative">
-                            <Input
-                              name="price"
-                              type="number"
-                              value={formData.price}
-                              onChange={handleChange}
-                              required
-                              min="0"
-                              step="0.01"
-                              className="w-full h-12 px-4 bg-white dark:bg-slate-700 border-2 border-gray-200 dark:border-slate-600 focus:border-green-500 dark:focus:border-green-400 rounded-lg transition-all duration-300 group-hover:border-green-300"
-                              placeholder="Enter price in NPR (e.g., 150.00)"
-                            />
-                            {completedFields.has('price') && <CheckCircle className="absolute right-3 top-3 w-6 h-6 text-green-500" />}
-                          </div>
-                        </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                          <div className="group">
-                            <Label className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-3 flex items-center gap-2">
-                              <Package className="w-5 h-5" /> Quantity (Stock)
+                          <motion.div variants={itemVariants} className="group">
+                            <Label className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                              <Tag className="w-4 h-4" /> Category
                             </Label>
                             <div className="relative">
-                              <Input
-                                name="quantity"
-                                type="number"
-                                value={formData.quantity}
+                              <select
+                                name="category"
+                                value={formData.category}
                                 onChange={handleChange}
                                 required
-                                min="1"
-                                step="1"
-                                className="w-full h-12 px-4 bg-white dark:bg-slate-700 border-2 border-gray-200 dark:border-slate-600 focus:border-green-500 dark:focus:border-green-400 rounded-lg transition-all duration-300 group-hover:border-green-300"
-                                placeholder="Available stock (e.g., 100)"
-                              />
-                              {completedFields.has('quantity') && <CheckCircle className="absolute right-3 top-3 w-6 h-6 text-green-500" />}
+                                className="w-full h-12 px-4 bg-gray-100/50 dark:bg-slate-700/50 border border-gray-300 dark:border-slate-600/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-400 backdrop-blur-sm transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 focus:bg-gray-100/70 dark:focus:bg-slate-700/70 hover:bg-gray-100/60 dark:hover:bg-slate-700/60 appearance-none"
+                                style={{
+                                  boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05) dark:inset-[0_2px_4px_rgba(0,0,0,0.3),0_1px_2px_rgba(255,255,255,0.1)]'
+                                }}
+                              >
+                                <option value="" disabled>Select a category</option>
+                                {categories.map((category) => (
+                                  <option key={category} value={category}>{category}</option>
+                                ))}
+                              </select>
+                              {completedFields.has('category') && <CheckCircle className="absolute right-3 top-3 w-6 h-6 text-green-500" />}
                             </div>
-                          </div>
+                          </motion.div>
 
+                          <motion.div variants={itemVariants} className="group">
+                            <Label className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">Brand</Label>
+                            <div className="relative">
+                              <Input
+                                name="brand"
+                                value={formData.brand}
+                                onChange={handleChange}
+                                required
+                                className="w-full h-12 px-4 bg-gray-100/50 dark:bg-slate-700/50 border border-gray-300 dark:border-slate-600/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-400 backdrop-blur-sm transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 focus:bg-gray-100/70 dark:focus:bg-slate-700/70 hover:bg-gray-100/60 dark:hover:bg-slate-700/60"
+                                placeholder="Brand name..."
+                                style={{
+                                  boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05) dark:inset-[0_2px_4px_rgba(0,0,0,0.3),0_1px_2px_rgba(255,255,255,0.1)]'
+                                }}
+                              />
+                              {completedFields.has('brand') && <CheckCircle className="absolute right-3 top-3 w-6 h-6 text-green-500" />}
+                            </div>
+                          </motion.div>
+                        </div>
+                      </>
+                    )}
+
+                    {currentStep === 1 && (
+                      <>
+                        <div className="space-y-6">
                           <div className="group">
                             <Label className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-3 flex items-center gap-2">
-                              <Scale className="w-5 h-5" /> Weight (kg)
+                              <DollarSign className="w-5 h-5" /> Price (NPR)
                             </Label>
                             <div className="relative">
                               <Input
-                                name="weight"
+                                name="price"
                                 type="number"
-                                value={formData.weight}
+                                value={formData.price}
                                 onChange={handleChange}
                                 required
                                 min="0"
-                                step="0.1"
-                                className="w-full h-12 px-4 bg-white dark:bg-slate-700 border-2 border-gray-200 dark:border-slate-600 focus:border-green-500 dark:focus:border-green-400 rounded-lg transition-all duration-300 group-hover:border-green-300"
-                                placeholder="Weight in kg (e.g., 2.5)"
+                                step="0.01"
+                                className="w-full h-12 px-4 bg-gray-100/50 dark:bg-slate-700/50 border border-gray-300 dark:border-slate-600/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-400 backdrop-blur-sm transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/50 focus:bg-gray-100/70 dark:focus:bg-slate-700/70 hover:bg-gray-100/60 dark:hover:bg-slate-700/60"
+                                placeholder="Enter price in NPR (e.g., 150.00)"
+                                style={{
+                                  boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05) dark:inset-[0_2px_4px_rgba(0,0,0,0.3),0_1px_2px_rgba(255,255,255,0.1)]'
+                                }}
                               />
-                              {completedFields.has('weight') && <CheckCircle className="absolute right-3 top-3 w-6 h-6 text-green-500" />}
+                              {completedFields.has('price') && <CheckCircle className="absolute right-3 top-3 w-6 h-6 text-green-500" />}
                             </div>
                           </div>
-                        </div>
-                      </div>
 
-                      <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mt-6">
-                        <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
-                          <DollarSign className="w-5 h-5" />
-                          <span className="font-semibold">Pricing Information</span>
-                        </div>
-                        <p className="text-sm text-green-600 dark:text-green-300 mt-1">
-                          Set competitive pricing for your agricultural products. Include quantity available and total weight for buyers.
-                        </p>
-                      </div>
-                    </>
-                  )}
-
-                  {currentStep === 2 && (
-                    <>
-                      <div className="space-y-6">
-                        <div className="group">
-                          <Label className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-3 flex items-center gap-2">
-                            <MapPin className="w-5 h-5" /> Location (City or Address)
-                          </Label>
-                          <div className="relative">
-                            <Input
-                              name="city"
-                              value={formData.city}
-                              onChange={handleChange}
-                              required
-                              disabled={isGeocoding}
-                              className="w-full h-12 px-4 bg-white dark:bg-slate-700 border-2 border-gray-200 dark:border-slate-600 focus:border-purple-500 dark:focus:border-purple-400 rounded-lg transition-all duration-300 group-hover:border-purple-300"
-                              placeholder="e.g., Kathmandu, Nepal"
-                            />
-                            {isGeocoding && <Loader2 className="absolute right-3 top-3 w-6 h-6 text-purple-500 animate-spin" />}
-                            {completedFields.has('city') && !isGeocoding && <CheckCircle className="absolute right-3 top-3 w-6 h-6 text-green-500" />}
-                          </div>
-                        </div>
-
-                        <div className="group">
-                          <Label className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-3 flex items-center gap-2">
-                            <Upload className="w-5 h-5" /> Product Image
-                          </Label>
-                          <div className="relative">
-                            <Input
-                              type="file"
-                              accept="image/*"
-                              onChange={handleFileChange}
-                              required
-                              className="w-full h-12 px-4 bg-white dark:bg-slate-700 border-2 border-gray-200 dark:border-slate-600 focus:border-purple-500 dark:focus:border-purple-400 rounded-lg transition-all duration-300 group-hover:border-purple-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-purple-50 dark:file:bg-purple-900/30 file:text-purple-700 dark:file:text-purple-300 hover:file:bg-purple-100 dark:hover:file:bg-purple-800/40"
-                            />
-                            {completedFields.has('image') && <CheckCircle className="absolute right-3 top-3 w-6 h-6 text-green-500" />}
-                          </div>
-
-                          {imagePreview && (
-                            <div className="mt-6 flex justify-center">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                            <div className="group">
+                              <Label className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                                <Package className="w-5 h-5" /> Quantity (Stock)
+                              </Label>
                               <div className="relative">
-                                <img
-                                  src={imagePreview}
-                                  alt="Product preview"
-                                  className="w-48 h-48 object-cover rounded-xl shadow-lg border-4 border-purple-200 dark:border-purple-800 transition-transform hover:scale-105"
+                                <Input
+                                  name="quantity"
+                                  type="number"
+                                  value={formData.quantity}
+                                  onChange={handleChange}
+                                  required
+                                  min="1"
+                                  step="1"
+                                  className="w-full h-12 px-4 bg-gray-100/50 dark:bg-slate-700/50 border border-gray-300 dark:border-slate-600/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-400 backdrop-blur-sm transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/50 focus:bg-gray-100/70 dark:focus:bg-slate-700/70 hover:bg-gray-100/60 dark:hover:bg-slate-700/60"
+                                  placeholder="Available stock (e.g., 100)"
+                                  style={{
+                                    boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05) dark:inset-[0_2px_4px_rgba(0,0,0,0.3),0_1px_2px_rgba(255,255,255,0.1)]'
+                                  }}
                                 />
-                                <div className="absolute -top-3 -right-3 bg-green-500 text-white rounded-full p-2 shadow-lg">
-                                  <CheckCircle className="w-5 h-5" />
-                                </div>
+                                {completedFields.has('quantity') && <CheckCircle className="absolute right-3 top-3 w-6 h-6 text-green-500" />}
                               </div>
                             </div>
-                          )}
+
+                            <div className="group">
+                              <Label className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                                <Scale className="w-5 h-5" /> Weight (kg)
+                              </Label>
+                              <div className="relative">
+                                <Input
+                                  name="weight"
+                                  type="number"
+                                  value={formData.weight}
+                                  onChange={handleChange}
+                                  required
+                                  min="0"
+                                  step="0.1"
+                                  className="w-full h-12 px-4 bg-gray-100/50 dark:bg-slate-700/50 border border-gray-300 dark:border-slate-600/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-400 backdrop-blur-sm transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/50 focus:bg-gray-100/70 dark:focus:bg-slate-700/70 hover:bg-gray-100/60 dark:hover:bg-slate-700/60"
+                                  placeholder="Weight in kg (e.g., 2.5)"
+                                  style={{
+                                    boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05) dark:inset-[0_2px_4px_rgba(0,0,0,0.3),0_1px_2px_rgba(255,255,255,0.1)]'
+                                  }}
+                                />
+                                {completedFields.has('weight') && <CheckCircle className="absolute right-3 top-3 w-6 h-6 text-green-500" />}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4 mt-6">
-                        <div className="flex items-center gap-2 text-purple-700 dark:text-purple-400">
-                          <MapPin className="w-5 h-5" />
-                          <span className="font-semibold">Location & Image Guidelines</span>
+                        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mt-6">
+                          <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                            <DollarSign className="w-5 h-5" />
+                            <span className="font-semibold">Pricing Information</span>
+                          </div>
+                          <p className="text-sm text-green-600 dark:text-green-300 mt-1">
+                            Set competitive pricing for your agricultural products. Include quantity available and total weight for buyers.
+                          </p>
                         </div>
-                        <p className="text-sm text-purple-600 dark:text-purple-300 mt-1">
-                          Provide your location in Nepal for local buyers to find you easily. Upload a clear, high-quality image of your product.
-                        </p>
-                      </div>
-                    </>
-                  )}
-                </motion.div>
+                      </>
+                    )}
 
-                <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-200 dark:border-slate-700">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={prevStep}
-                    disabled={currentStep === 0}
-                    className="px-6 py-3 disabled:opacity-50"
-                  >
-                    Previous
-                  </Button>
+                    {currentStep === 2 && (
+                      <>
+                        <div className="space-y-6">
+                          <div className="group">
+                            <Label className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                              <MapPin className="w-5 h-5" /> Location (City or Address)
+                            </Label>
+                            <div className="relative">
+                              <Input
+                                name="city"
+                                value={formData.city}
+                                onChange={handleChange}
+                                required
+                                disabled={isGeocoding}
+                                className="w-full h-12 px-4 bg-gray-100/50 dark:bg-slate-700/50 border border-gray-300 dark:border-slate-600/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-400 backdrop-blur-sm transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 focus:bg-gray-100/70 dark:focus:bg-slate-700/70 hover:bg-gray-100/60 dark:hover:bg-slate-700/60"
+                                placeholder="e.g., Kathmandu, Nepal"
+                                style={{
+                                  boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05) dark:inset-[0_2px_4px_rgba(0,0,0,0.3),0_1px_2px_rgba(255,255,255,0.1)]'
+                                }}
+                              />
+                              {isGeocoding && <Loader2 className="absolute right-3 top-3 w-6 h-6 text-purple-500 animate-spin" />}
+                              {completedFields.has('city') && !isGeocoding && <CheckCircle className="absolute right-3 top-3 w-6 h-6 text-green-500" />}
+                            </div>
+                          </div>
 
-                  {currentStep < formSteps.length - 1 ? (
+                          <div className="group">
+                            <Label className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                              <Upload className="w-5 h-5" /> Product Image
+                            </Label>
+                            <div className="relative">
+                              <Input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleFileChange}
+                                required
+                                className="w-full h-12 px-4 bg-gray-100/50 dark:bg-slate-700/50 border border-gray-300 dark:border-slate-600/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-400 backdrop-blur-sm transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 focus:bg-gray-100/70 dark:focus:bg-slate-700/70 hover:bg-gray-100/60 dark:hover:bg-slate-700/60 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-purple-50 dark:file:bg-purple-900/30 file:text-purple-700 dark:file:text-purple-300 hover:file:bg-purple-100 dark:hover:file:bg-purple-800/40"
+                                style={{
+                                  boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05) dark:inset-[0_2px_4px_rgba(0,0,0,0.3),0_1px_2px_rgba(255,255,255,0.1)]'
+                                }}
+                              />
+                              {completedFields.has('image') && <CheckCircle className="absolute right-3 top-3 w-6 h-6 text-green-500" />}
+                            </div>
+
+                            {imagePreview && (
+                              <div className="mt-6 flex justify-center">
+                                <div className="relative">
+                                  <img
+                                    src={imagePreview}
+                                    alt="Product preview"
+                                    className="w-48 h-48 object-cover rounded-xl shadow-lg border-4 border-purple-200 dark:border-purple-800 transition-transform hover:scale-105"
+                                  />
+                                  <div className="absolute -top-3 -right-3 bg-green-500 text-white rounded-full p-2 shadow-lg">
+                                    <CheckCircle className="w-5 h-5" />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4 mt-6">
+                          <div className="flex items-center gap-2 text-purple-700 dark:text-purple-400">
+                            <MapPin className="w-5 h-5" />
+                            <span className="font-semibold">Location & Image Guidelines</span>
+                          </div>
+                          <p className="text-sm text-purple-600 dark:text-purple-300 mt-1">
+                            Provide your location in Nepal for local buyers to find you easily. Upload a clear, high-quality image of your product.
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </motion.div>
+
+                  <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-200 dark:border-slate-700">
                     <Button
                       type="button"
-                      onClick={nextStep}
-                      disabled={!isStepComplete(currentStep)}
-                      className={`px-8 py-3 bg-gradient-to-r ${currentStepData.color} text-white shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:transform-none`}
+                      variant="outline"
+                      onClick={prevStep}
+                      disabled={currentStep === 0}
+                      className="px-6 py-3 bg-gray-200/50 hover:bg-gray-300/70 border border-gray-300 text-gray-700 font-medium rounded-xl transition-all duration-300 backdrop-blur-sm transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 dark:bg-slate-600/50 dark:hover:bg-slate-600/70 dark:border-slate-500/50 dark:text-slate-300"
+                      style={{
+                        boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1), inset 0 1px 2px rgba(255, 255, 255, 0.1) dark:[0_4px_15px_rgba(0,0,0,0.3),inset_0_1px_2px_rgba(255,255,255,0.1)]'
+                      }}
                     >
-                      Next Step
+                      Previous
                     </Button>
-                  ) : (
-                    <Button
-                      type="submit"
-                      disabled={isLoading || isGeocoding || !isStepComplete(currentStep)}
-                      className="px-8 py-3 bg-gradient-to-r from-green-500 to-blue-500 text-white shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:transform-none"
-                    >
-                      {isLoading || isGeocoding ? (
-                        <>
-                          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-5 h-5 mr-2" />
-                          Create Product
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </div>
-              </form>
-            </div>
-          </Card>
+
+                    {currentStep < formSteps.length - 1 ? (
+                      <Button
+                        type="button"
+                        onClick={nextStep}
+                        disabled={!isStepComplete(currentStep)}
+                        className={`px-8 py-3 bg-gradient-to-r ${currentStepData.color} text-white shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:transform-none`}
+                      >
+                        Next Step
+                      </Button>
+                    ) : (
+                      <Button
+                        type="submit"
+                        disabled={isLoading || isGeocoding || !isStepComplete(currentStep)}
+                        className="px-8 py-3 bg-gradient-to-r from-green-500 to-blue-500 text-white shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:transform-none"
+                      >
+                        {isLoading || isGeocoding ? (
+                          <>
+                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-5 h-5 mr-2" />
+                            Create Product
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                </form>
+              </div>
+            </Card>
+          </div>
         </motion.div>
       </motion.div>
+
+      <style>{`
+        @keyframes snake-light {
+          0% {
+            border-image: conic-gradient(
+              from 0deg,
+              rgba(59, 130, 246, 0.9) 0deg,
+              rgba(147, 51, 234, 0.9) 30deg,
+              transparent 40deg,
+              transparent 320deg,
+              rgba(59, 130, 246, 0.9) 360deg
+            ) 1;
+            border-image-slice: 1;
+          }
+          25% {
+            border-image: conic-gradient(
+              from 90deg,
+              rgba(59, 130, 246, 0.9) 0deg,
+              rgba(147, 51, 234, 0.9) 30deg,
+              transparent 40deg,
+              transparent 320deg,
+              rgba(59, 130, 246, 0.9) 360deg
+            ) 1;
+            border-image-slice: 1;
+          }
+          50% {
+            border-image: conic-gradient(
+              from 180deg,
+              rgba(59, 130, 246, 0.9) 0deg,
+              rgba(147, 51, 234, 0.9) 30deg,
+              transparent 40deg,
+              transparent 320deg,
+              rgba(59, 130, 246, 0.9) 360deg
+            ) 1;
+            border-image-slice: 1;
+          }
+          75% {
+            border-image: conic-gradient(
+              from 270deg,
+              rgba(59, 130, 246, 0.9) 0deg,
+              rgba(147, 51, 234, 0.9) 30deg,
+              transparent 40deg,
+              transparent 320deg,
+              rgba(59, 130, 246, 0.9) 360deg
+            ) 1;
+            border-image-slice: 1;
+          }
+          100% {
+            border-image: conic-gradient(
+              from 360deg,
+              rgba(59, 130, 246, 0.9) 0deg,
+              rgba(147, 51, 234, 0.9) 30deg,
+              transparent 40deg,
+              transparent 320deg,
+              rgba(59, 130, 246, 0.9) 360deg
+            ) 1;
+            border-image-slice: 1;
+          }
+        }
+
+        .snake-border {
+          position: relative;
+          border: 5px solid transparent;
+          border-radius: 16px;
+          animation: snake-light 3s linear infinite;
+        }
+      `}</style>
     </div>
   );
 }

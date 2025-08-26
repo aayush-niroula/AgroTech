@@ -492,202 +492,282 @@ export const incrementChatCount = async (req: Request, res: Response) => {
 };
 
 
-export const getPersonalizedRecommendations = async (req: Request, res: Response) => {
+
+export const getPersonalizedRecommendations = async (
+  req: Request,
+  res: Response
+) => {
   try {
-    const userId = req.userId as string; // Ensure userId is typed
+    const userId = req.userId; // comes from your auth middleware
     if (!userId) {
-      return res.status(401).json({ success: false, message: "Unauthorized" });
+      return res.status(401).json({ message: "Unauthorized" });
     }
 
-    // Optional location params
-    const { coordinates, maxDistance } = req.query;
-    let coords: number[] | null = null;
-    let maxDist = 50000; // Default 50km
-
-    if (coordinates) {
-      coords = parseCoordinates(coordinates as string);
-      if (!coords || coords.length !== 2) {
-        return res.status(400).json({ success: false, message: "Invalid coordinates format" });
-      }
-      maxDist = Number(maxDistance) || maxDist;
-      if (isNaN(maxDist) || maxDist <= 0) {
-        return res.status(400).json({ success: false, message: "Invalid maxDistance" });
-      }
-    }
-
-    // Fetch user with populated fields
-    const user = await User.findById<IUser>(userId).populate([
-      { path: "activity.viewedProducts", model: "Product" },
-      { path: "activity.favoritedProducts", model: "Product" },
-      { path: "activity.chattedProducts", model: "Product" },
-    ]);
+    const user = await User.findById(userId).lean();
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res.status(404).json({ message: "User not found" });
     }
 
-    // Explicitly cast product arrays
-    const viewedProducts = user.activity.viewedProducts as unknown as IProduct[];
-    const favoritedProducts = user.activity.favoritedProducts as unknown as IProduct[];
-    const chattedProducts = user.activity.chattedProducts as unknown as IProduct[];
-
-    // Collect interacted product IDs
-    const interactedProductIds = new Set<mongoose.Types.ObjectId>([
-      ...viewedProducts.map((p) => p._id as mongoose.Types.ObjectId),
-      ...favoritedProducts.map((p) => p._id as mongoose.Types.ObjectId),
-      ...chattedProducts.map((p) => p._id as mongoose.Types.ObjectId),
+    // Collect product IDs the user has interacted with (from User.activity)
+    const interactedProducts = new Set([
+      ...(user.activity?.viewedProducts || []),
+      ...(user.activity?.favoritedProducts || []),
+      ...(user.activity?.chattedProducts || []),
+      ...(user.addedProducts || []), // products user listed
     ]);
 
-    // 🔹 Fallback for no activity
-    if (interactedProductIds.size === 0) {
-      const fallbackRecs = await Product.aggregate([
+    const interactedIds = [
+      ...(user.activity?.viewedProducts || []),
+      ...(user.activity?.favoritedProducts || []),
+      ...(user.activity?.chattedProducts || []),
+    ];
+
+    // If no interactions (cold start), fallback to popular recent products
+    if (interactedIds.length === 0) {
+      const fallbackRecommendations = await Product.aggregate([
+        {
+          $match: {
+            sellerId: { $ne: new mongoose.Types.ObjectId(userId) },
+          },
+        },
         {
           $addFields: {
             popularityScore: {
               $add: [
-                { $multiply: [{ $ifNull: ["$views", 0] }, 0.1] },
-                { $multiply: [{ $ifNull: ["$favorites", 0] }, 0.3] },
+                { $multiply: [{ $ifNull: ["$views", 0] }, 0.05] },
+                { $multiply: [{ $ifNull: ["$favorites", 0] }, 0.2] },
                 { $multiply: [{ $ifNull: ["$chatCount", 0] }, 0.4] },
-                { $multiply: [{ $ifNull: ["$rating", 0] }, 0.2] },
+                { $multiply: [{ $ifNull: ["$rating", 0] }, 0.3] },
+                { $multiply: [{ $ifNull: ["$reviewCount", 0] }, 0.1] },
+              ],
+            },
+            recencyScore: {
+              $divide: [
+                { $subtract: [new Date(), "$createdAt"] },
+                1000 * 60 * 60 * 24, // Days since posted
               ],
             },
           },
         },
-        { $sort: { popularityScore: -1 } },
-        { $limit: 10 },
+        {
+          $addFields: {
+            finalScore: {
+              $subtract: [
+                "$popularityScore",
+                { $multiply: ["$recencyScore", 0.05] },
+              ],
+            },
+          },
+        },
+        { $sort: { finalScore: -1 } },
+        { $limit: 20 },
         {
           $lookup: {
             from: "users",
             localField: "sellerId",
             foreignField: "_id",
-            as: "sellerId",
+            as: "seller",
           },
         },
-        { $unwind: { path: "$sellerId", preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: "$seller", preserveNullAndEmptyArrays: true } },
       ]);
-      return res.json({
-        success: true,
-        data: fallbackRecs,
-        message: "No activity yet—showing popular products",
-      });
+      return res.status(200).json({ success: true, data: fallbackRecommendations });
     }
 
-    // 🔹 Aggregate user behavior
-    const behaviorCounts = await UserBehavior.aggregate([
-      { $match: { userId: user._id, actionType: { $in: ["view", "chat"] } } },
+    // Count categories and brands from interacted products (content-based)
+    const categoryCounts: Record<string, number> = {};
+    const brandCounts: Record<string, number> = {};
+    const interactedProductsData = await Product.find({
+      _id: { $in: interactedIds },
+    }).lean();
+
+    for (const product of interactedProductsData) {
+      if (product.category) {
+        categoryCounts[product.category] = (categoryCounts[product.category] || 0) + 1;
+      }
+      if (product.brand) {
+        brandCounts[product.brand] = (brandCounts[product.brand] || 0) + 1;
+      }
+    }
+
+    // Build $switch branches for category and brand
+    const categoryBranches = Object.entries(categoryCounts).map(([category, count]) => ({
+      case: { $eq: ["$category", category] },
+      then: count * 2,
+    }));
+    const brandBranches = Object.entries(brandCounts).map(([brand, count]) => ({
+      case: { $eq: ["$brand", brand] },
+      then: count * 1.5, // Lower weight than category
+    }));
+
+    // Collaborative Filtering: Find similar users and their recommended products
+    // Step 1: Get user's positive interactions (favorite/chat, weighted higher)
+    const userInteractions = await UserBehavior.aggregate([
+      {
+        $match: {
+          userId: new mongoose.Types.ObjectId(userId),
+          actionType: { $in: ["favorite", "chat", "view"] },
+        },
+      },
       {
         $group: {
           _id: "$productId",
-          viewCount: { $sum: { $cond: [{ $eq: ["$actionType", "view"] }, 1, 0] } },
-          chatCount: { $sum: { $cond: [{ $eq: ["$actionType", "chat"] }, 1, 0] } },
+          score: {
+            $sum: {
+              $switch: {
+                branches: [
+                  { case: { $eq: ["$actionType", "favorite"] }, then: 3 },
+                  { case: { $eq: ["$actionType", "chat"] }, then: 4 },
+                  { case: { $eq: ["$actionType", "view"] }, then: 1 },
+                ],
+                default: 0,
+              },
+            },
+          },
         },
       },
     ]);
 
-    // Create a map of counts
-    const countsMap: Record<string, { viewCount: number; chatCount: number }> = {};
-    behaviorCounts.forEach((b) => {
-      countsMap[b._id.toString()] = { viewCount: b.viewCount, chatCount: b.chatCount };
-    });
+    const userProductScores = userInteractions.reduce((acc, item) => {
+      acc[item._id.toString()] = item.score;
+      return acc;
+    }, {} as Record<string, number>);
 
-    // Fetch interacted products
-    const interactedProducts = await Product.find<IProduct>({
-      _id: { $in: Array.from(interactedProductIds) },
-    });
+    // Step 2: Find similar users (those who interacted with at least 2 overlapping products)
+    const similarUsers = await UserBehavior.aggregate([
+      {
+        $match: {
+          productId: { $in: interactedIds.map(id => new mongoose.Types.ObjectId(id)) },
+          userId: { $ne: new mongoose.Types.ObjectId(userId) },
+        },
+      },
+      { $group: { _id: "$userId", sharedProducts: { $addToSet: "$productId" } } },
+      { $match: { $expr: { $gte: [{ $size: "$sharedProducts" }, 2] } } }, // At least 2 shared
+      { $limit: 50 }, // Limit for performance
+    ]);
 
-    // 🔹 Calculate scores
-    const scoresMap: Record<string, number> = {};
-    interactedProducts.forEach((product) => {
-      const pid = (product._id as mongoose.Types.ObjectId).toString();
-      const viewCount = countsMap[pid]?.viewCount || 0;
-      const chatCount = countsMap[pid]?.chatCount || 0;
-      const isFavorited = favoritedProducts.some((p) =>
-        (p._id as mongoose.Types.ObjectId).equals(product._id as mongoose.Types.ObjectId)
-      );
-      scoresMap[pid] = viewCount * 1 + chatCount * 5 + (isFavorited ? 3 : 0);
-    });
+    const similarUserIds = similarUsers.map(u => u._id);
 
-    // 🔹 Category scoring
-    const categoryScores: Record<string, number> = {};
-    const numProductsPerCategory: Record<string, number> = {};
-
-    interactedProducts.forEach((product) => {
-      const pid = (product._id as mongoose.Types.ObjectId).toString();
-      const cat = product.category;
-      const score = scoresMap[pid] || 0;
-      categoryScores[cat] = (categoryScores[cat] || 0) + score;
-      numProductsPerCategory[cat] = (numProductsPerCategory[cat] || 0) + 1;
-    });
-
-    const preferredCategories = Object.keys(categoryScores);
-    if (preferredCategories.length === 0) {
-      return res.status(200).json({ success: true, data: [], message: "No categorized activity yet" });
+    // Step 3: Get products from similar users, score by frequency and action weight
+    let collabProducts = [];
+    if (similarUserIds.length > 0) {
+      collabProducts = await UserBehavior.aggregate([
+        {
+          $match: {
+            userId: { $in: similarUserIds },
+            productId: { $nin: Array.from(interactedProducts) }, // Exclude user's interacted
+          },
+        },
+        {
+          $group: {
+            _id: "$productId",
+            collabScore: {
+              $sum: {
+                $switch: {
+                  branches: [
+                    { case: { $eq: ["$actionType", "favorite"] }, then: 3 },
+                    { case: { $eq: ["$actionType", "chat"] }, then: 4 },
+                    { case: { $eq: ["$actionType", "view"] }, then: 1 },
+                  ],
+                  default: 0,
+                },
+              },
+            },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { collabScore: -1 } },
+        { $limit: 50 }, // Pre-limit before joining
+      ]);
     }
 
-    // 🔹 Build switch for category boost
-    const switchBranches = preferredCategories.map((cat) => ({
-      case: { $eq: ["$category", cat] },
-      then: categoryScores[cat],
-    }));
+    const collabProductScores = collabProducts.reduce((acc, item) => {
+      acc[item._id.toString()] = item.collabScore * (item.count / similarUserIds.length); // Normalize by user count
+      return acc;
+    }, {} as Record<string, number>);
 
-    // 🔹 Recommendation pipeline
+    // Main Product Aggregation Pipeline (Hybrid: Content + Collab)
     const pipeline: any[] = [
       {
         $match: {
-          _id: { $nin: Array.from(interactedProductIds) },
-          category: { $in: preferredCategories },
+          _id: { $nin: Array.from(interactedProducts) },
+          sellerId: { $ne: new mongoose.Types.ObjectId(userId) },
         },
       },
       {
         $addFields: {
           popularityScore: {
             $add: [
-              { $multiply: [{ $ifNull: ["$views", 0] }, 0.1] },
-              { $multiply: [{ $ifNull: ["$favorites", 0] }, 0.3] },
+              { $multiply: [{ $ifNull: ["$views", 0] }, 0.05] },
+              { $multiply: [{ $ifNull: ["$favorites", 0] }, 0.2] },
               { $multiply: [{ $ifNull: ["$chatCount", 0] }, 0.4] },
-              { $multiply: [{ $ifNull: ["$rating", 0] }, 0.2] },
+              { $multiply: [{ $ifNull: ["$rating", 0] }, 0.3] },
+              { $multiply: [{ $ifNull: ["$reviewCount", 0] }, 0.1] },
             ],
           },
-          userCategoryScore: {
-            $switch: {
-              branches: switchBranches,
-              default: 0,
+          recencyScore: {
+            $divide: [
+              { $subtract: [new Date(), "$createdAt"] },
+              1000 * 60 * 60 * 24,
+            ],
+          },
+          userCategoryScore: categoryBranches.length
+            ? { $switch: { branches: categoryBranches, default: 0 } }
+            : 0,
+          userBrandScore: brandBranches.length
+            ? { $switch: { branches: brandBranches, default: 0 } }
+            : 0,
+          collabScore: {
+            $toDouble: { // Lookup from collab dict (use $function for dynamic lookup)
+              $function: {
+                body: `function(collabScores, productId) { return collabScores[productId.toString()] || 0; }`,
+                args: [collabProductScores, "$_id"],
+                lang: "js",
+              },
             },
           },
         },
       },
-      { $addFields: { finalScore: { $add: ["$popularityScore", "$userCategoryScore"] } } },
+      {
+        $addFields: {
+          contentScore: { $add: ["$userCategoryScore", "$userBrandScore"] },
+          finalScore: {
+            $subtract: [
+              {
+                $add: [
+                  "$popularityScore",
+                  { $multiply: ["$contentScore", 0.6] }, // 60% content
+                  { $multiply: ["$collabScore", 0.4] }, // 40% collab
+                ],
+              },
+              { $multiply: ["$recencyScore", 0.05] },
+            ],
+          },
+        },
+      },
       { $sort: { finalScore: -1 } },
-      { $limit: 10 },
+      { $limit: 20 },
       {
         $lookup: {
           from: "users",
           localField: "sellerId",
           foreignField: "_id",
-          as: "sellerId",
+          as: "seller",
         },
       },
-      { $unwind: { path: "$sellerId", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$seller", preserveNullAndEmptyArrays: true } },
     ];
 
-    // 🔹 Add geo filtering
-    if (coords) {
-      pipeline.unshift({
-        $geoNear: {
-          near: { type: "Point", coordinates: [coords[0], coords[1]] },
-          distanceField: "distance",
-          spherical: true,
-          maxDistance: maxDist,
-          query: { category: { $in: preferredCategories }, _id: { $nin: Array.from(interactedProductIds) } },
-        },
-      });
-      pipeline[pipeline.length - 5] = { $sort: { finalScore: -1, distance: 1 } };
-    }
-
     const recommendations = await Product.aggregate(pipeline);
-
-    return res.json({ success: true, data: recommendations });
-  } catch (error: any) {
-    console.error("Personalized recommendation error:", error);
-    return res.status(500).json({ success: false, message: `Server error: ${error.message}` });
+    return res.status(200).json({
+      success: true,
+      data: recommendations,
+    });
+  } catch (error) {
+    console.error("Error getting recommendations:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to get recommendations",
+    });
   }
 };

@@ -29,6 +29,7 @@ export interface IProduct {
   quantity: number;
   rating: number;
   sellerId: string | Seller;
+  seller?:Seller;
   soldCount: number;
   updatedAt: string;
   createdAt: string;
