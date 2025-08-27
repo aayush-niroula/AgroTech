@@ -15,11 +15,12 @@ export const createOrGetConversation = async (req: AuthenticatedRequest, res: Re
   try {
     let conversation = await Conversation.findOne({
       members: { $all: [userId, sellerId] },
-    });
+    }).populate("members","name avatarUrl")
 
     if (!conversation) {
       conversation = new Conversation({ members: [userId, sellerId] });
       await conversation.save();
+      await conversation.populate("members", "name avatarUrl");
     }
 
     res.status(200).json({ success: true, data: conversation });

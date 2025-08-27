@@ -5,7 +5,7 @@ import {
   getProductById,
   updateProduct,
   deleteProduct,
-  getRecommendedProducts,
+  
   getProducts,
   incrementProductView,
   toggleFavorite,
@@ -21,9 +21,6 @@ const productRoutes = express.Router();
 // Specific routes first to avoid conflicts with dynamic routes
 productRoutes.get('/search', async (req: Request, res: Response) => {
   getProducts(req, res); // FIXED: Moved before /:id to prevent misrouting
-});
-productRoutes.get('/recommendations', async (req: Request, res: Response) => {
-  getRecommendedProducts(req, res);
 });
 productRoutes.get('/personalized', authMiddleware, async (req: Request, res: Response) => {
   getPersonalizedRecommendations(req, res);

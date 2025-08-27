@@ -188,34 +188,58 @@ export const deleteProduct = async (req: Request, res: Response) => {
 
 export const getProducts = async (req: Request, res: Response) => {
   try {
-    const { category, brand, maxDistance, coordinates } = req.query;
+    const { category, brand, maxDistance, coordinates, searchTerm } = req.query;
 
+    // Build base (non-geo) filters
     const baseQuery: Record<string, any> = {};
-    if (category) baseQuery.category = { $regex: `^${category}$`, $options: 'i' }; // Case-insensitive
+    if (category) baseQuery.category = { $regex: `^${category}$`, $options: 'i' }; // exact (case-insensitive)
     if (brand) baseQuery.brand = { $regex: `^${brand}$`, $options: 'i' };
+
+    if (searchTerm) {
+      const term = String(searchTerm).trim();
+      if (term) {
+        const rx = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'); // escape + i
+        baseQuery.$or = [
+          { title: rx },
+          { description: rx },
+          { brand: rx },
+          { category: rx },
+        ];
+      }
+    }
+
+    // Decide whether to use geo filter
+    const hasCoords = typeof coordinates === 'string' && coordinates.length > 0;
+    const parsedMax = maxDistance !== undefined ? Number(maxDistance) : undefined;
+    const useGeo =
+      hasCoords &&
+      parsedMax !== undefined &&
+      !Number.isNaN(parsedMax) &&
+      parsedMax > 0;
 
     let products;
 
-    if (coordinates) {
+    if (useGeo) {
       const coords = parseCoordinates(coordinates as string); // [lng, lat]
       if (!coords) {
-        return res.status(400).json({ success: false, message: "Invalid coordinates format" });
+        return res.status(400).json({ success: false, message: 'Invalid coordinates format' });
       }
-
       const [lng, lat] = coords;
 
-      const maxDist = Number(maxDistance) || 50000;
-      if (isNaN(maxDist) || maxDist <= 0) {
-        return res.status(400).json({ success: false, message: "Invalid maxDistance" });
-      }
+      // Use exactly what the client asked for
+      const maxDist = parsedMax as number;
 
-      console.log("Executing geospatial query", { coordinates: [lng, lat], maxDistance: maxDist, baseQuery });
+      console.log('Executing geospatial query', {
+        coordinates: [lng, lat],
+        maxDistance: maxDist,
+        baseQuery,
+      });
 
       products = await Product.aggregate([
         {
           $geoNear: {
-            near: { type: "Point", coordinates: [lng, lat] },
-            distanceField: "distance",
+            near: { type: 'Point', coordinates: [lng, lat] },
+            distanceField: 'distance',
             spherical: true,
             maxDistance: maxDist,
             query: baseQuery,
@@ -223,49 +247,30 @@ export const getProducts = async (req: Request, res: Response) => {
         },
         {
           $lookup: {
-            from: "users",
-            localField: "sellerId",
-            foreignField: "_id",
-            as: "sellerId",
+            from: 'users',
+            localField: 'sellerId',
+            foreignField: '_id',
+            as: 'sellerId',
           },
         },
         {
-          $unwind: {
-            path: "$sellerId",
-            preserveNullAndEmptyArrays: true,
-          },
+          $unwind: { path: '$sellerId', preserveNullAndEmptyArrays: true },
         },
       ]);
-
-      if (products.length === 0) {
-        console.warn("No products found for geospatial query", {
-          coordinates: [lng, lat],
-          maxDistance: maxDist,
-          baseQuery,
-        });
-        return res.status(200).json({
-          success: true,
-          data: [],
-          message: "No products found within the specified radius or filters",
-        });
-      }
     } else {
-      products = await Product.find(baseQuery).populate("sellerId");
-
-      if (products.length === 0) {
-        console.warn("No products found for base query", { baseQuery });
-        return res.status(200).json({
-          success: true,
-          data: [],
-          message: "No products match the specified filters",
-        });
-      }
+      // No geo filter → return all matching products
+      products = await Product.find(baseQuery).populate('sellerId');
     }
 
-    console.log("Products found:", products.length);
-    res.json({ success: true, data: products });
+    return res.status(200).json({
+      success: true,
+      data: products,
+      ...(useGeo
+        ? undefined
+        : { message: 'Returned non-geofiltered results (no/invalid radius provided).' }),
+    });
   } catch (error: any) {
-    console.error("❌ Error fetching products:", {
+    console.error('❌ Error fetching products:', {
       message: error.message,
       stack: error.stack,
       query: req.query,
@@ -273,76 +278,7 @@ export const getProducts = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: `Server Error: ${error.message}` });
   }
 };
-export const getRecommendedProducts = async (req: Request, res: Response) => {
-  try {
-    const { productId, coordinates } = req.query;
 
-    if (!coordinates) {
-      return res.status(400).json({ success: false, message: 'Coordinates are required' });
-    }
-
-    const coords = parseCoordinates(coordinates as string);
-    if (!coords || coords.length !== 2) {
-      return res.status(400).json({ success: false, message: 'Invalid coordinates format' });
-    }
-    const [lng, lat] = coords;
-
-    const currentProduct = await Product.findById(productId);
-    if (!currentProduct) {
-      return res.status(404).json({ success: false, message: 'Product not found' });
-    }
-
-    const baseQuery: Record<string, any> = {
-      _id: { $ne: new mongoose.Types.ObjectId(productId as string) },
-      category: currentProduct.category,
-    };
-
-    const recommendations = await Product.aggregate([
-      {
-        $geoNear: {
-          near: { type: 'Point', coordinates: [lng, lat] },
-          distanceField: 'distance',
-          spherical: true,
-          maxDistance: 50000, // 50 km
-          query: baseQuery, // FIXED: Added query filter
-        },
-      },
-      {
-        $addFields: {
-          score: {
-            $add: [
-              { $multiply: [{ $ifNull: ['$views', 0] }, 0.1] },
-              { $multiply: [{ $ifNull: ['$favorites', 0] }, 0.3] },
-              { $multiply: [{ $ifNull: ['$soldCount', 0] }, 0.4] },
-              { $multiply: [{ $ifNull: ['$rating', 0] }, 0.2] },
-            ],
-          },
-        },
-      },
-      { $sort: { score: -1, distance: 1 } },
-      { $limit: 10 },
-      {
-        $lookup: {
-          from: "users",
-          localField: "sellerId",
-          foreignField: "_id",
-          as: "sellerId", // FIXED: Consistent naming
-        },
-      },
-      {
-        $unwind: {
-          path: "$sellerId",
-          preserveNullAndEmptyArrays: true, // FIXED: Handle missing sellerId
-        },
-      },
-    ]);
-
-    res.json({ success: true, data: recommendations }); // FIXED: Consistent response shape
-  } catch (error: any) {
-    console.error('Error fetching recommended products:', error);
-    res.status(500).json({ success: false, message: `Server Error: ${error.message}` });
-  }
-};
 
 export const incrementProductView = async (req: Request, res: Response) => {
   try {
@@ -374,39 +310,27 @@ export const toggleFavorite = async (req: Request, res: Response) => {
     const { increment } = req.body;
     const userId = req.userId;
 
-    if (!userId) {
-      return res.status(401).json({ success: false, message: "Unauthorized" });
-    }
-    if (typeof increment !== "boolean") {
-      return res.status(400).json({ success: false, message: "Increment must be a boolean" });
-    }
-    if (!mongoose.Types.ObjectId.isValid(productId)) {
-      return res.status(400).json({ success: false, message: "Invalid productId" });
-    }
+    if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+    if (typeof increment !== "boolean") return res.status(400).json({ success: false, message: "Increment must be a boolean" });
+    if (!mongoose.Types.ObjectId.isValid(productId)) return res.status(400).json({ success: false, message: "Invalid productId" });
 
     // Update product favorite count
-    const update = increment
-      ? { $inc: { favorites: 1 } }
-      : { $inc: { favorites: -1 } };
-    const updatedProduct = await Product.findByIdAndUpdate(productId, update, { new: true });
+    const updatedProduct = await Product.findByIdAndUpdate(
+      productId,
+      increment ? { $inc: { favorites: 1 } } : { $inc: { favorites: -1 } },
+      { new: true }
+    );
+    if (!updatedProduct) return res.status(404).json({ success: false, message: "Product not found" });
 
-    if (!updatedProduct) {
-      return res.status(404).json({ success: false, message: "Product not found" });
-    }
-
-    // Update user's favorite list
+    // Update user's activity
     await User.findByIdAndUpdate(userId, {
       [increment ? "$addToSet" : "$pull"]: {
-        "activity.favoritedProducts": productId,
-      },
-    });
+        "activity.favoritedProducts": new mongoose.Types.ObjectId(productId)
+      }
+    }, { new: true, upsert: true });
 
-    // Always log "favorite" but store increment separately if needed
-    await UserBehavior.create({
-      userId,
-      productId,
-      actionType: "favorite", // ✅ Always "favorite"
-    });
+    // Log behavior
+    await UserBehavior.create({ userId, productId, actionType: "favorite", createdAt: new Date() });
 
     res.json({
       success: true,
@@ -415,10 +339,7 @@ export const toggleFavorite = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error("Error toggling favorite:", error);
-    res.status(500).json({
-      success: false,
-      message: `Server error: ${error.message}`,
-    });
+    res.status(500).json({ success: false, message: `Server error: ${error.message}` });
   }
 };
 
@@ -428,25 +349,21 @@ export const recordProductViewBehavior = async (req: Request, res: Response) => 
     const userId = req.userId;
 
     if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
-    if (!mongoose.Types.ObjectId.isValid(productId)) {
-      return res.status(400).json({ success: false, message: 'Invalid productId' });
-    }
+    if (!mongoose.Types.ObjectId.isValid(productId)) return res.status(400).json({ success: false, message: 'Invalid productId' });
 
     const product = await Product.findById(productId);
     if (!product) return res.status(404).json({ success: false, message: "Product not found" });
 
-    await UserBehavior.create({
-      userId,
-      productId,
-      actionType: "view",
-      createdAt: new Date(),
-    });
-
-    await User.findByIdAndUpdate(userId, {
-      $addToSet: { "activity.viewedProducts": productId },
-    });
-
+    // Increment product views
     await Product.findByIdAndUpdate(productId, { $inc: { views: 1 } });
+
+    // Save in user activity
+    await User.findByIdAndUpdate(userId, {
+      $addToSet: { "activity.viewedProducts": new mongoose.Types.ObjectId(productId) }
+    }, { new: true, upsert: true });
+
+    // Optionally log behavior
+    await UserBehavior.create({ userId, productId, actionType: "view", createdAt: new Date() });
 
     res.json({ success: true, message: "View recorded" });
   } catch (error: any) {
@@ -454,133 +371,83 @@ export const recordProductViewBehavior = async (req: Request, res: Response) => 
     res.status(500).json({ success: false, message: `Server error: ${error.message}` });
   }
 };
-
 export const incrementChatCount = async (req: Request, res: Response) => {
   try {
     const { productId } = req.params;
     const userId = req.userId;
 
     if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
-    if (!mongoose.Types.ObjectId.isValid(productId)) {
-      return res.status(400).json({ success: false, message: 'Invalid productId' });
-    }
+    if (!mongoose.Types.ObjectId.isValid(productId)) return res.status(400).json({ success: false, message: 'Invalid productId' });
 
+    // Increment product chat count
     const updatedProduct = await Product.findByIdAndUpdate(
       productId,
       { $inc: { chatCount: 1 } },
       { new: true }
     );
-
     if (!updatedProduct) return res.status(404).json({ success: false, message: "Product not found" });
 
+    // Save in user activity
     await User.findByIdAndUpdate(userId, {
-      $addToSet: { "activity.chattedProducts": productId },
-    });
+      $addToSet: { "activity.chattedProducts": new mongoose.Types.ObjectId(productId) }
+    }, { new: true, upsert: true });
 
-    await UserBehavior.create({
-      userId,
-      productId,
-      actionType: "chat",
-      createdAt: new Date(),
-    });
+    // Log behavior
+    await UserBehavior.create({ userId, productId, actionType: "chat", createdAt: new Date() });
 
     res.json({ success: true, message: "Chat count incremented", product: updatedProduct });
   } catch (error: any) {
     console.error("Error incrementing chat count:", error);
-    res.status(500).json({ success: false, message: `Server Error: ${error.message}` });
+    res.status(500).json({ success: false, message: `Server error: ${error.message}` });
   }
 };
 
 
 
-export const getPersonalizedRecommendations = async (
-  req: Request,
-  res: Response
-) => {
+export const getPersonalizedRecommendations = async (req: Request, res: Response) => {
   try {
-    const userId = req.userId; // comes from your auth middleware
-    if (!userId) {
-      return res.status(401).json({ message: "Unauthorized" });
+    const userId = req.userId;
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(401).json({ success: false, message: 'Unauthorized or invalid user ID' });
     }
 
     const user = await User.findById(userId).lean();
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Collect product IDs the user has interacted with (from User.activity)
+    // Ensure activity fields exist
+    const activity = user.activity || { viewedProducts: [], favoritedProducts: [], chattedProducts: [] };
+    
+    // All product IDs user interacted with
     const interactedProducts = new Set([
-      ...(user.activity?.viewedProducts || []),
-      ...(user.activity?.favoritedProducts || []),
-      ...(user.activity?.chattedProducts || []),
-      ...(user.addedProducts || []), // products user listed
+      ...(activity.viewedProducts || []),
+      ...(activity.favoritedProducts || []),
+      ...(activity.chattedProducts || []),
+      ...(user.addedProducts || []),
     ]);
 
-    const interactedIds = [
-      ...(user.activity?.viewedProducts || []),
-      ...(user.activity?.favoritedProducts || []),
-      ...(user.activity?.chattedProducts || []),
-    ];
-
-    // If no interactions (cold start), fallback to popular recent products
-    if (interactedIds.length === 0) {
-      const fallbackRecommendations = await Product.aggregate([
-        {
-          $match: {
-            sellerId: { $ne: new mongoose.Types.ObjectId(userId) },
-          },
-        },
-        {
-          $addFields: {
-            popularityScore: {
-              $add: [
-                { $multiply: [{ $ifNull: ["$views", 0] }, 0.05] },
-                { $multiply: [{ $ifNull: ["$favorites", 0] }, 0.2] },
-                { $multiply: [{ $ifNull: ["$chatCount", 0] }, 0.4] },
-                { $multiply: [{ $ifNull: ["$rating", 0] }, 0.3] },
-                { $multiply: [{ $ifNull: ["$reviewCount", 0] }, 0.1] },
-              ],
-            },
-            recencyScore: {
-              $divide: [
-                { $subtract: [new Date(), "$createdAt"] },
-                1000 * 60 * 60 * 24, // Days since posted
-              ],
-            },
-          },
-        },
-        {
-          $addFields: {
-            finalScore: {
-              $subtract: [
-                "$popularityScore",
-                { $multiply: ["$recencyScore", 0.05] },
-              ],
-            },
-          },
-        },
-        { $sort: { finalScore: -1 } },
-        { $limit: 20 },
-        {
-          $lookup: {
-            from: "users",
-            localField: "sellerId",
-            foreignField: "_id",
-            as: "seller",
-          },
-        },
-        { $unwind: { path: "$seller", preserveNullAndEmptyArrays: true } },
-      ]);
-      return res.status(200).json({ success: true, data: fallbackRecommendations });
+    // If cold start, fallback to popular recent products
+    if (interactedProducts.size === 0) {
+      const fallback = await Product.find({ sellerId: { $ne: userId } })
+        .sort({ views: -1, favorites: -1, chatCount: -1, createdAt: -1 })
+        .limit(20)
+        .populate('sellerId', 'name email')
+        .lean();
+      return res.status(200).json({ success: true, data: fallback });
     }
 
-    // Count categories and brands from interacted products (content-based)
+    // CONTENT-BASED SCORES
+    const interactedIds = Array.from(interactedProducts).filter(id => mongoose.Types.ObjectId.isValid(id));
+    if (interactedIds.length === 0) {
+      console.warn('No valid product IDs for recommendations');
+      return res.status(200).json({ success: true, data: [] });
+    }
+
+    const interactedProductsData = await Product.find({ _id: { $in: interactedIds } }).lean();
+
     const categoryCounts: Record<string, number> = {};
     const brandCounts: Record<string, number> = {};
-    const interactedProductsData = await Product.find({
-      _id: { $in: interactedIds },
-    }).lean();
-
     for (const product of interactedProductsData) {
       if (product.category) {
         categoryCounts[product.category] = (categoryCounts[product.category] || 0) + 1;
@@ -590,107 +457,21 @@ export const getPersonalizedRecommendations = async (
       }
     }
 
-    // Build $switch branches for category and brand
+    // Build $switch branches for aggregation
     const categoryBranches = Object.entries(categoryCounts).map(([category, count]) => ({
-      case: { $eq: ["$category", category] },
+      case: { $eq: ['$category', category] },
       then: count * 2,
     }));
     const brandBranches = Object.entries(brandCounts).map(([brand, count]) => ({
-      case: { $eq: ["$brand", brand] },
-      then: count * 1.5, // Lower weight than category
+      case: { $eq: ['$brand', brand] },
+      then: count * 1.5,
     }));
 
-    // Collaborative Filtering: Find similar users and their recommended products
-    // Step 1: Get user's positive interactions (favorite/chat, weighted higher)
-    const userInteractions = await UserBehavior.aggregate([
-      {
-        $match: {
-          userId: new mongoose.Types.ObjectId(userId),
-          actionType: { $in: ["favorite", "chat", "view"] },
-        },
-      },
-      {
-        $group: {
-          _id: "$productId",
-          score: {
-            $sum: {
-              $switch: {
-                branches: [
-                  { case: { $eq: ["$actionType", "favorite"] }, then: 3 },
-                  { case: { $eq: ["$actionType", "chat"] }, then: 4 },
-                  { case: { $eq: ["$actionType", "view"] }, then: 1 },
-                ],
-                default: 0,
-              },
-            },
-          },
-        },
-      },
-    ]);
-
-    const userProductScores = userInteractions.reduce((acc, item) => {
-      acc[item._id.toString()] = item.score;
-      return acc;
-    }, {} as Record<string, number>);
-
-    // Step 2: Find similar users (those who interacted with at least 2 overlapping products)
-    const similarUsers = await UserBehavior.aggregate([
-      {
-        $match: {
-          productId: { $in: interactedIds.map(id => new mongoose.Types.ObjectId(id)) },
-          userId: { $ne: new mongoose.Types.ObjectId(userId) },
-        },
-      },
-      { $group: { _id: "$userId", sharedProducts: { $addToSet: "$productId" } } },
-      { $match: { $expr: { $gte: [{ $size: "$sharedProducts" }, 2] } } }, // At least 2 shared
-      { $limit: 50 }, // Limit for performance
-    ]);
-
-    const similarUserIds = similarUsers.map(u => u._id);
-
-    // Step 3: Get products from similar users, score by frequency and action weight
-    let collabProducts = [];
-    if (similarUserIds.length > 0) {
-      collabProducts = await UserBehavior.aggregate([
-        {
-          $match: {
-            userId: { $in: similarUserIds },
-            productId: { $nin: Array.from(interactedProducts) }, // Exclude user's interacted
-          },
-        },
-        {
-          $group: {
-            _id: "$productId",
-            collabScore: {
-              $sum: {
-                $switch: {
-                  branches: [
-                    { case: { $eq: ["$actionType", "favorite"] }, then: 3 },
-                    { case: { $eq: ["$actionType", "chat"] }, then: 4 },
-                    { case: { $eq: ["$actionType", "view"] }, then: 1 },
-                  ],
-                  default: 0,
-                },
-              },
-            },
-            count: { $sum: 1 },
-          },
-        },
-        { $sort: { collabScore: -1 } },
-        { $limit: 50 }, // Pre-limit before joining
-      ]);
-    }
-
-    const collabProductScores = collabProducts.reduce((acc, item) => {
-      acc[item._id.toString()] = item.collabScore * (item.count / similarUserIds.length); // Normalize by user count
-      return acc;
-    }, {} as Record<string, number>);
-
-    // Main Product Aggregation Pipeline (Hybrid: Content + Collab)
+    // AGGREGATION PIPELINE
     const pipeline: any[] = [
       {
         $match: {
-          _id: { $nin: Array.from(interactedProducts) },
+          _id: { $nin: interactedIds.map(id => new mongoose.Types.ObjectId(id)) },
           sellerId: { $ne: new mongoose.Types.ObjectId(userId) },
         },
       },
@@ -698,76 +479,46 @@ export const getPersonalizedRecommendations = async (
         $addFields: {
           popularityScore: {
             $add: [
-              { $multiply: [{ $ifNull: ["$views", 0] }, 0.05] },
-              { $multiply: [{ $ifNull: ["$favorites", 0] }, 0.2] },
-              { $multiply: [{ $ifNull: ["$chatCount", 0] }, 0.4] },
-              { $multiply: [{ $ifNull: ["$rating", 0] }, 0.3] },
-              { $multiply: [{ $ifNull: ["$reviewCount", 0] }, 0.1] },
+              { $multiply: [{ $ifNull: ['$views', 0] }, 0.05] },
+              { $multiply: [{ $ifNull: ['$favorites', 0] }, 0.2] },
+              { $multiply: [{ $ifNull: ['$chatCount', 0] }, 0.4] },
+              { $multiply: [{ $ifNull: ['$rating', 0] }, 0.3] },
+              { $multiply: [{ $ifNull: ['$reviewCount', 0] }, 0.1] },
             ],
           },
           recencyScore: {
-            $divide: [
-              { $subtract: [new Date(), "$createdAt"] },
-              1000 * 60 * 60 * 24,
-            ],
-          },
-          userCategoryScore: categoryBranches.length
-            ? { $switch: { branches: categoryBranches, default: 0 } }
-            : 0,
-          userBrandScore: brandBranches.length
-            ? { $switch: { branches: brandBranches, default: 0 } }
-            : 0,
-          collabScore: {
-            $toDouble: { // Lookup from collab dict (use $function for dynamic lookup)
-              $function: {
-                body: `function(collabScores, productId) { return collabScores[productId.toString()] || 0; }`,
-                args: [collabProductScores, "$_id"],
-                lang: "js",
-              },
+            $cond: {
+              if: { $and: [{ $ne: ['$createdAt', null] }, { $ne: ['$createdAt', undefined] }] },
+              then: { $divide: [{ $subtract: [new Date(), '$createdAt'] }, 1000 * 60 * 60 * 24] },
+              else: 0,
             },
           },
+          userCategoryScore: categoryBranches.length ? { $switch: { branches: categoryBranches, default: 0 } } : 0,
+          userBrandScore: brandBranches.length ? { $switch: { branches: brandBranches, default: 0 } } : 0,
         },
       },
       {
         $addFields: {
-          contentScore: { $add: ["$userCategoryScore", "$userBrandScore"] },
+          contentScore: { $add: ['$userCategoryScore', '$userBrandScore'] },
           finalScore: {
             $subtract: [
-              {
-                $add: [
-                  "$popularityScore",
-                  { $multiply: ["$contentScore", 0.6] }, // 60% content
-                  { $multiply: ["$collabScore", 0.4] }, // 40% collab
-                ],
-              },
-              { $multiply: ["$recencyScore", 0.05] },
+              { $add: ['$popularityScore', { $multiply: ['$contentScore', 0.6] }] },
+              { $multiply: ['$recencyScore', 0.05] },
             ],
           },
         },
       },
       { $sort: { finalScore: -1 } },
       { $limit: 20 },
-      {
-        $lookup: {
-          from: "users",
-          localField: "sellerId",
-          foreignField: "_id",
-          as: "seller",
-        },
-      },
-      { $unwind: { path: "$seller", preserveNullAndEmptyArrays: true } },
+      { $lookup: { from: 'users', localField: 'sellerId', foreignField: '_id', as: 'seller' } },
+      { $unwind: { path: '$seller', preserveNullAndEmptyArrays: true } },
     ];
 
-    const recommendations = await Product.aggregate(pipeline);
-    return res.status(200).json({
-      success: true,
-      data: recommendations,
-    });
-  } catch (error) {
-    console.error("Error getting recommendations:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to get recommendations",
-    });
+    const recommendations = await Product.aggregate(pipeline).exec();
+
+    return res.status(200).json({ success: true, data: recommendations });
+  } catch (error: any) {
+    console.error('Error fetching recommendations:', error.message, error.stack);
+    return res.status(500).json({ success: false, message: 'Failed to get recommendations', error: error.message });
   }
 };

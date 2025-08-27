@@ -9,31 +9,46 @@ import {
   useSendMessageMutation,
 } from '@/services/chatApi';
 
+interface User {
+  _id: string;
+  name?: string;
+  avatarUrl?: string;
+}
+
 interface Message {
   _id?: string;
   id?: string;
-  senderId: string | { _id: string; name?: string };
+  senderId: string | User;
   receiverId: string;
   text: string;
   timestamp: string;
   createdAt?: string;
 }
 
+interface Conversation {
+  _id: string;
+  members: User[];
+}
+
 export default function ChatPage() {
   const { sellerId } = useParams<{ sellerId: string }>();
+  const [conversation, setConversation] = useState<Conversation | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [sellerName, setSellerName] = useState('');
+  const [sellerAvatar, setSellerAvatar] = useState('');
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
   const currentUser = useSelector((state: RootState) => state.auth.user);
-  console.log("current user", currentUser)
+
   const [createOrGetConversation] = useCreateOrGetConversationMutation();
   const { data: messagesData } = useGetMessagesQuery(conversationId || '', {
     skip: !conversationId,
   });
   const [sendMessageMutation] = useSendMessageMutation();
 
+  // 🔹 Initialize conversation + socket
   useEffect(() => {
     if (!sellerId || !currentUser?.id) {
       console.log('Missing sellerId or user, skipping conversation init');
@@ -48,14 +63,22 @@ export default function ChatPage() {
           buyerId: currentUser.id,
           sellerId,
         }).unwrap();
+
+        setConversation(result);
         setConversationId(result._id);
 
+        // Extract seller info
+        const otherUser = result.members.find((m: User) => m._id !== currentUser.id);
+        setSellerName(otherUser?.name || 'Seller');
+        setSellerAvatar(otherUser?.avatarUrl || '');
+
+        // Setup socket
         socket = io('http://localhost:3000');
         socketRef.current = socket;
         socket.emit('join_conversation', result._id);
 
         socket.on('receive_message', (message: Message) => {
-         const normalizedMessage: Message = {
+          const normalizedMessage: Message = {
             _id: message._id,
             id: message.id,
             senderId: message.senderId,
@@ -83,6 +106,7 @@ export default function ChatPage() {
     };
   }, [sellerId, currentUser?.id, createOrGetConversation]);
 
+  // 🔹 Load messages from API
   useEffect(() => {
     if (!messagesData || !currentUser?.id || !sellerId) return;
 
@@ -96,17 +120,19 @@ export default function ChatPage() {
     setMessages(mappedMessages);
   }, [messagesData, currentUser?.id, sellerId]);
 
+  // 🔹 Scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // 🔹 Handle send
   const handleSend = async () => {
     if (!newMessage.trim() || !conversationId || !currentUser?.id || !sellerId) {
       console.warn('Cannot send message: missing input or context');
       return;
     }
 
-    const message: Message = {
+    const tempMessage: Message = {
       id: Math.random().toString(36).substring(2),
       senderId: currentUser.id,
       receiverId: sellerId,
@@ -114,33 +140,33 @@ export default function ChatPage() {
       timestamp: new Date().toISOString(),
     };
 
-    setMessages((prev) => [...prev, message]);
+    setMessages((prev) => [...prev, tempMessage]);
     setNewMessage('');
 
     try {
       const sentMsg = await sendMessageMutation({
         conversationId,
         sender: currentUser.id,
-        text: message.text,
+        text: tempMessage.text,
       }).unwrap();
-       console.log("sentMsg", sentMsg)
+
       socketRef.current?.emit('send_message', {
         conversationId,
         message: {
           _id: sentMsg._id,
           senderId: currentUser.id,
           receiverId: sellerId,
-          text: newMessage.trim(),
+          text: tempMessage.text,
           timestamp: sentMsg.createdAt || sentMsg.timestamp || new Date().toISOString(),
         },
       });
 
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === message.id
+          m.id === tempMessage.id
             ? {
                 _id: sentMsg._id,
-                id: message.id,
+                id: tempMessage.id,
                 senderId: sentMsg.senderId,
                 receiverId: sellerId,
                 text: sentMsg.text,
@@ -159,26 +185,52 @@ export default function ChatPage() {
 
   return (
     <div className="max-w-xl mx-auto p-4 h-screen flex flex-col border rounded shadow">
-      <header className="text-xl font-bold mb-4 border-b pb-2">
-        Chat with Seller: {sellerId}
+      {/* 🔹 Header with avatar */}
+      <header className="flex items-center gap-3 mb-4 border-b pb-2">
+        {sellerAvatar ? (
+          <img
+            src={sellerAvatar}
+            alt={sellerName}
+            className="w-10 h-10 rounded-full object-cover"
+          />
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-gray-300" />
+        )}
+        <h1 className="text-xl font-bold">{sellerName || 'Seller'}</h1>
       </header>
 
+      {/* 🔹 Messages */}
       <main className="flex-grow overflow-auto mb-4 space-y-2 flex flex-col">
         {messages.map((msg) => {
-                  const isMe =
+          const isMe =
             typeof msg.senderId === 'object' && msg.senderId !== null && '_id' in msg.senderId
               ? msg.senderId._id === currentUser.id
               : msg.senderId === currentUser.id;
 
-          const validTimestamp = msg.timestamp && !isNaN(new Date(msg.timestamp).getTime())
-            ? new Date(msg.timestamp).toLocaleTimeString()
-            : 'Unknown time';
+          const validTimestamp =
+            msg.timestamp && !isNaN(new Date(msg.timestamp).getTime())
+              ? new Date(msg.timestamp).toLocaleTimeString()
+              : 'Unknown time';
+
+          const senderAvatar =
+            typeof msg.senderId === 'object' && msg.senderId?.avatarUrl
+              ? msg.senderId.avatarUrl
+              : isMe
+              ? currentUser.avatarUrl
+              : sellerAvatar;
 
           return (
             <div
               key={msg._id || msg.id || Math.random().toString(36).substring(2)}
-              className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
+              className={`flex items-end gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}
             >
+              {!isMe && senderAvatar && (
+                <img
+                  src={senderAvatar}
+                  alt="avatar"
+                  className="w-8 h-8 rounded-full object-cover"
+                />
+              )}
               <div
                 className={`max-w-[70%] p-2 rounded-xl shadow ${
                   isMe
@@ -195,6 +247,7 @@ export default function ChatPage() {
         <div ref={messagesEndRef} />
       </main>
 
+      {/* 🔹 Input */}
       <footer className="flex gap-2">
         <input
           type="text"

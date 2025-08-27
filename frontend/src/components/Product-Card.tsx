@@ -35,9 +35,9 @@ export function ProductCard({
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
 
   const navigate = useNavigate();
-  const { isAuthenticated } = useSelector((state: RootState) => ({
-    isAuthenticated: !!state.auth.user,
-  }));
+ const isAuthenticated = useSelector(
+  (state: RootState) => !!state.auth.user
+);
 
   const [toggleFavorite, { isLoading: togglingFavorite }] = useToggleFavoriteMutation();
 

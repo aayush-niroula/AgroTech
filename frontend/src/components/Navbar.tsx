@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useDispatch, useSelector } from "react-redux";
 import { type RootState } from "@/app/store";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { socket } from "@/utils/socketClient";
 import {
   DropdownMenu,
@@ -80,6 +80,8 @@ export const Navbar = () => {
   );
 
   const user = useSelector((state: RootState) => state.auth.user);
+  console.log(user);
+  
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
@@ -269,11 +271,13 @@ export const Navbar = () => {
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-
+    
+    
           {/* User Profile */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Avatar className="cursor-pointer ring-2 ring-green-500/20 hover:ring-green-500/40 transition-all duration-200 shadow-md hover:shadow-lg">
+                 <AvatarImage src={user?.avatarUrl || ""} alt={user?.name || "User"} />
                 <AvatarFallback className="bg-gradient-to-br from-green-400 to-green-600 text-white font-semibold">
                   {user?.name?.charAt(0) ?? "U"}
                 </AvatarFallback>

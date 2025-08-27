@@ -15,7 +15,6 @@ import { useSelector } from 'react-redux';
 import type { IProduct, ApiResponse, Seller } from '@/types/product';
 import { debounce } from 'lodash';
 
-// Use environment variable for API key
 const OPENCAGE_API_KEY = 'baffb2c26c114e6994d055bfeee4afda';
 
 async function getCoords(address: string): Promise<{ lat: number; lng: number }> {
@@ -39,9 +38,9 @@ async function getCoords(address: string): Promise<{ lat: number; lng: number }>
 export default function MarketplacePage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [radius, setRadius] = useState<number>(50);
-  const [userLocation, setUserLocation] = useState<[number, number] | null>(null); // [lng, lat]
-  const [mapCenter, setMapCenter] = useState<[number, number] | null>(null); // [lat, lng]
+  const [radius, setRadius] = useState<number>(0);
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
   const [favoritedProducts, setFavoritedProducts] = useState<string[]>([]);
   const [isGeolocationReady, setIsGeolocationReady] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -50,13 +49,13 @@ export default function MarketplacePage() {
   const [geocodingLoading, setGeocodingLoading] = useState(false);
   const [geocodingError, setGeocodingError] = useState<string | null>(null);
   const [selectedProductForRoute, setSelectedProductForRoute] = useState<IProduct | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null); // New state for mutation errors
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const navigate = useNavigate();
   const [toggleFavorite] = useToggleFavoriteMutation();
   const [incrementProductView] = useIncrementProductViewMutation();
-  const isAuthenticated = useSelector((state: any) => state.auth.isAuthenticated); // Adjust based on your auth state
- 
+  const isAuthenticated = useSelector((state: any) => state.auth.isAuthenticated);
+
   const debouncedSearchLocation = useCallback(
     debounce(async (query: string) => {
       if (!query) return;
@@ -92,7 +91,7 @@ export default function MarketplacePage() {
           setIsGeolocationReady(true);
         },
         () => {
-          setUserLocation([85.324, 27.7172]); // Kathmandu
+          setUserLocation([85.324, 27.7172]);
           setMapCenter([27.7172, 85.324]);
           setIsGeolocationReady(true);
         },
@@ -130,15 +129,17 @@ export default function MarketplacePage() {
     };
   }, [trackLocation]);
 
-  const queryParams: any = {
-    category: selectedCategory || undefined,
-    searchTerm: searchTerm || undefined, // Add searchTerm for backend filtering
-    coordinates: userLocation ? `${userLocation[0]},${userLocation[1]}` : undefined,
-    maxDistance: userLocation ? radius * 1000 : undefined,
-  };
+  const queryParams = useMemo(
+    () => ({
+      category: selectedCategory || undefined,
+      searchTerm: searchTerm || undefined,
+      coordinates: userLocation ? `${userLocation[0]},${userLocation[1]}` : undefined,
+      maxDistance: userLocation ? radius * 1000 : undefined,
+    }),
+    [selectedCategory, searchTerm, userLocation, radius]
+  );
 
   const { data, isLoading, isError, error } = useGetProductsQuery(queryParams);
-
   const productList: IProduct[] = (data as ApiResponse<IProduct[]> | undefined)?.data ?? [];
 
   const categories = useMemo(
@@ -146,10 +147,9 @@ export default function MarketplacePage() {
     [productList]
   );
 
-  // Client-side filtering (optional if backend handles searchTerm)
   const filteredProducts = useMemo(() => {
     let filtered = [...productList];
-    if (searchTerm && !queryParams.searchTerm) { // Only filter client-side if backend doesn't
+    if (searchTerm && !queryParams.searchTerm) {
       const lowerSearch = searchTerm.toLowerCase();
       filtered = filtered.filter((product) =>
         [product.title, product.description, product.brand].some((field) =>
@@ -158,10 +158,10 @@ export default function MarketplacePage() {
       );
     }
     return filtered;
-  }, [productList, searchTerm, selectedCategory]);
+  }, [productList, searchTerm, queryParams.searchTerm]);
 
   const handleToggleFavorite = async (productId: string) => {
-    setActionError(null); // Clear previous errors
+    setActionError(null);
     if (!isAuthenticated) {
       setActionError('Please log in to favorite products.');
       navigate('/login');
@@ -180,7 +180,7 @@ export default function MarketplacePage() {
   };
 
   const handleChat = async (sellerId: string | Seller, productId: string) => {
-    setActionError(null); // Clear previous errors
+    setActionError(null);
     try {
       const sellerIdString = typeof sellerId === 'string' ? sellerId : sellerId._id;
       navigate(`/chat/${sellerIdString}`);
@@ -191,7 +191,7 @@ export default function MarketplacePage() {
   };
 
   const handleViewDetails = async (productId: string) => {
-    setActionError(null); // Clear previous errors
+    setActionError(null);
     try {
       await incrementProductView(productId).unwrap();
       navigate(`/product/${productId}`);

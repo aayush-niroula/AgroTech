@@ -10,7 +10,7 @@ import { Product } from "../models/product.model";
 
 export const registerUser = async (req: Request, res: Response) => {
   try {
-    const { name, email, password, isAdmin } = req.body;  
+    const { name, email, password, isAdmin ,avatarUrl} = req.body;  
 
     // Validate required fields
     if (!name || !email || !password) {
@@ -49,6 +49,7 @@ export const registerUser = async (req: Request, res: Response) => {
       name: newUser.name,
       email: newUser.email,
       isAdmin: newUser.isAdmin,
+      avatarUrl: avatarUrl || "",
       createdAt: newUser.createdAt,
       updatedAt: newUser.updatedAt,
     };
@@ -64,7 +65,7 @@ export const registerUser = async (req: Request, res: Response) => {
 
 export const loginUser = async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body;
+    const { email, password ,avatarUrl} = req.body;
     console.log(req.body)
 
     // Validate required fields
@@ -104,6 +105,7 @@ export const loginUser = async (req: Request, res: Response) => {
     name: user.name,
     email: user.email,
     isAdmin: user.isAdmin,
+    avatarUrl:user.avatarUrl|| "",
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   },
@@ -130,6 +132,7 @@ export const getUserProfile = async (req: Request, res: Response) => {
       name: user.name,
       email: user.email,
       isAdmin: user.isAdmin,
+      avatarUrl:user.avatarUrl || "",
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
