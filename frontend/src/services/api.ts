@@ -15,6 +15,6 @@ export const api = createApi({
     },
     credentials: 'include', 
   }),
-  tagTypes:['Product','Conversation','Message','Notification','Review','Testimonial'],
+  tagTypes:['Product','Conversation','Message','Notification','Review','Testimonial','User'],
   endpoints: () => ({}),
 });

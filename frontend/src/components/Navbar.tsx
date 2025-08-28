@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Leaf, Menu, X, Sun, Moon, Bell, MessageSquare } from "lucide-react";
+import { Leaf, Menu, X, Sun, Moon, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDispatch, useSelector } from "react-redux";
 import { type RootState } from "@/app/store";
@@ -16,9 +16,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { logout } from "@/app/slices/authSlice";
-import { useGetNotificationsQuery, useMarkNotificationAsReadMutation } from "@/services/notificationApi";
+import {
+  useGetNotificationsQuery,
+  useMarkNotificationAsReadMutation,
+} from "@/services/notificationApi";
 import { useGetUserByIdQuery } from "@/services/authApi";
+import { useGetAllUsersQuery } from "@/services/adminApi";
 
+// ------------------- Notification Item -------------------
 interface Notification {
   _id: string;
   senderId: {
@@ -32,7 +37,6 @@ interface Notification {
   createdAt: string;
 }
 
-// Separate component for rendering a single notification
 const NotificationItem = ({
   notification,
   onClick,
@@ -40,7 +44,9 @@ const NotificationItem = ({
   notification: Notification;
   onClick: (notification: Notification) => void;
 }) => {
-  const { data: sender, isLoading: isSenderLoading } = useGetUserByIdQuery(notification.senderId._id);
+  const { data: sender, isLoading: isSenderLoading } = useGetUserByIdQuery(
+    notification.senderId._id
+  );
 
   return (
     <DropdownMenuItem
@@ -58,9 +64,7 @@ const NotificationItem = ({
         <span className="font-medium text-sm">
           {isSenderLoading ? "Loading..." : sender?.name || "Unknown"}
         </span>
-        {!notification.isRead && (
-          <div className="w-2 h-2 bg-blue-500 rounded-full ml-auto" />
-        )}
+        {!notification.isRead && <div className="w-2 h-2 bg-blue-500 rounded-full ml-auto" />}
       </div>
       <p className="text-sm text-gray-600 dark:text-gray-400 truncate w-full mt-1">
         {notification.text}
@@ -80,20 +84,22 @@ export const Navbar = () => {
   );
 
   const user = useSelector((state: RootState) => state.auth.user);
-  console.log(user);
-  
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
-  const { data: notifications = [], isLoading, refetch } = useGetNotificationsQuery(undefined, {
+
+  const { data: notifications = [], refetch } = useGetNotificationsQuery(undefined, {
     skip: !user,
   });
   const [markNotificationAsRead] = useMarkNotificationAsReadMutation();
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  const { data: allUsers = [] } = useGetAllUsersQuery(undefined, {
+    skip: !user?.isAdmin,
+  });
 
   useEffect(() => {
     socket.on("receive_notification", () => {
-      console.log("receive_notification");
       refetch();
     });
     return () => {
@@ -102,10 +108,7 @@ export const Navbar = () => {
   }, [refetch]);
 
   useEffect(() => {
-    const handleScroll = () => {
-      const scrollTop = window.scrollY;
-      setScrolled(scrollTop > 20);
-    };
+    const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
@@ -121,13 +124,7 @@ export const Navbar = () => {
   };
 
   const handleNotificationClick = async (notification: Notification) => {
-    if (!notification.isRead) {
-      try {
-        await markNotificationAsRead(notification._id).unwrap();
-      } catch (error) {
-        console.error("Failed to mark notification as read:", error);
-      }
-    }
+    if (!notification.isRead) await markNotificationAsRead(notification._id).unwrap();
     navigate(`/seller/inbox?conversationId=${notification.conversationId}`);
   };
 
@@ -151,9 +148,7 @@ export const Navbar = () => {
           <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow duration-300">
             <Leaf className="w-5 h-5 text-white" />
           </div>
-          <span className="text-xl font-bold text-gray-800 dark:text-white">
-            AgroTech
-          </span>
+          <span className="text-xl font-bold text-gray-800 dark:text-white">AgroTech</span>
         </div>
 
         {/* Desktop Navigation */}
@@ -162,12 +157,15 @@ export const Navbar = () => {
             { href: "/features", label: "Features" },
             { href: "/marketplace", label: "Marketplace" },
             { href: "/createproduct", label: "Sell Products" },
-            { 
-              href: "/seller/inbox", 
+            {
+              href: "/seller/inbox",
               label: "Inbox",
               hasNotification: unreadCount > 0,
-              notificationCount: unreadCount
+              notificationCount: unreadCount,
             },
+            ...(user?.isAdmin
+              ? [{ href: "/admin", label: "Admin Dashboard" }]
+              : []),
           ].map((link) => (
             <a
               key={link.href}
@@ -185,9 +183,10 @@ export const Navbar = () => {
                   animate={{ scale: 1 }}
                   className="w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold ml-1"
                 >
-                  {link.notificationCount > 9 ? '9+' : link.notificationCount}
+                  {link.notificationCount > 9 ? "9+" : link.notificationCount}
                 </motion.div>
               )}
+             
             </a>
           ))}
         </nav>
@@ -195,29 +194,14 @@ export const Navbar = () => {
         {/* Right side controls */}
         <div className="flex items-center space-x-2">
           {/* Theme Toggle */}
-          <Button 
-            variant="ghost" 
-            onClick={toggleTheme} 
-            size="icon"
-            className="hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          >
-            {isDark ? (
-              <Sun className="w-5 h-5 text-yellow-500" />
-            ) : (
-              <Moon className="w-5 h-5 text-gray-600" />
-            )}
+          <Button variant="ghost" onClick={toggleTheme} size="icon">
+            {isDark ? <Sun className="w-5 h-5 text-yellow-500" /> : <Moon className="w-5 h-5 text-gray-600" />}
           </Button>
-
-
 
           {/* Notifications */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="relative hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              >
+              <Button variant="ghost" size="icon">
                 <Bell className="w-5 h-5" />
                 {unreadCount > 0 && (
                   <motion.div
@@ -232,22 +216,13 @@ export const Navbar = () => {
               <DropdownMenuLabel className="flex items-center justify-between">
                 <span>Notifications</span>
                 {unreadCount > 0 && (
-                  <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-                    {unreadCount}
-                  </span>
+                  <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">{unreadCount}</span>
                 )}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {isLoading ? (
-                <DropdownMenuItem className="text-gray-500 text-center py-4">
-                  Loading notifications...
-                </DropdownMenuItem>
-              ) : notifications.length === 0 ? (
+              {notifications.length === 0 ? (
                 <DropdownMenuItem className="text-gray-500 text-center py-8">
-                  <div className="flex flex-col items-center space-y-2">
-                    <Bell className="w-8 h-8 text-gray-300" />
-                    <span>No notifications</span>
-                  </div>
+                  No notifications
                 </DropdownMenuItem>
               ) : (
                 notifications.slice(0, 5).map((notification) => (
@@ -261,74 +236,40 @@ export const Navbar = () => {
               {notifications.length > 5 && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem 
-                    onClick={() => navigate("/seller/inbox")}
-                    className="text-center text-green-600 dark:text-green-400 font-medium hover:bg-green-50 dark:hover:bg-green-900/20"
-                  >
+                  <DropdownMenuItem onClick={() => navigate("/seller/inbox")} className="text-center text-green-600">
                     View All Notifications
                   </DropdownMenuItem>
                 </>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-    
-    
+
           {/* User Profile */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Avatar className="cursor-pointer ring-2 ring-green-500/20 hover:ring-green-500/40 transition-all duration-200 shadow-md hover:shadow-lg">
-                 <AvatarImage src={user?.avatarUrl || ""} alt={user?.name || "User"} />
-                <AvatarFallback className="bg-gradient-to-br from-green-400 to-green-600 text-white font-semibold">
-                  {user?.name?.charAt(0) ?? "U"}
-                </AvatarFallback>
+              <Avatar className="cursor-pointer ring-2 ring-green-500/20">
+                <AvatarImage src={user?.avatarUrl || ""} alt={user?.name || "User"} />
+                <AvatarFallback>{user?.name?.charAt(0) ?? "U"}</AvatarFallback>
               </Avatar>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56">
-              <DropdownMenuLabel className="pb-3">
+              <DropdownMenuLabel>
                 <div className="flex flex-col space-y-1">
-                  <div className="font-semibold text-gray-900 dark:text-gray-100">
-                    {user?.name}
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    {user?.email}
-                  </div>
+                  <div className="font-semibold">{user?.name}</div>
+                  <div className="text-xs text-gray-500">{user?.email}</div>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                onClick={() => navigate("/profile")}
-                className="hover:bg-gray-50 dark:hover:bg-gray-800"
-              >
-                Profile
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => navigate("/settings")}
-                className="hover:bg-gray-50 dark:hover:bg-gray-800"
-              >
-                Settings
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                onClick={handleLogout} 
-                className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-              >
+              <DropdownMenuItem onClick={() => navigate("/profile")}>Profile</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout} className="text-red-600">
                 Logout
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Mobile Menu Toggle */}
-          <Button
-            variant="ghost"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            className="md:hidden hover:bg-gray-100 dark:hover:bg-gray-800"
-            size="icon"
-          >
-            {mobileOpen ? (
-              <X className="w-6 h-6" />
-            ) : (
-              <Menu className="w-6 h-6" />
-            )}
+          {/* Mobile Menu */}
+          <Button variant="ghost" onClick={() => setMobileOpen(!mobileOpen)} size="icon" className="md:hidden">
+            {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </Button>
         </div>
       </div>
@@ -348,12 +289,13 @@ export const Navbar = () => {
                 { href: "/features", label: "Features" },
                 { href: "/marketplace", label: "Marketplace" },
                 { href: "/createproduct", label: "Sell Products" },
-                { 
-                  href: "/seller/inbox", 
+                {
+                  href: "/seller/inbox",
                   label: "Inbox",
                   hasNotification: unreadCount > 0,
-                  notificationCount: unreadCount
+                  notificationCount: unreadCount,
                 },
+                ...(user?.isAdmin ? [{ href: "/admin", label: "Admin Dashboard", badge: allUsers.length }] : []),
               ].map((link) => (
                 <a
                   key={link.href}
@@ -366,10 +308,10 @@ export const Navbar = () => {
                   }`}
                 >
                   <span>{link.label}</span>
-                  {link.hasNotification && (
-                    <div className="w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
-                      {link.notificationCount > 9 ? '9+' : link.notificationCount}
-                    </div>
+                  {link.badge && (
+                    <span className="ml-1 px-1 text-xs font-semibold bg-green-500 text-white rounded-full">
+                      {link.badge}
+                    </span>
                   )}
                 </a>
               ))}

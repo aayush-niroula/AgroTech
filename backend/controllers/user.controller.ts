@@ -39,6 +39,7 @@ export const registerUser = async (req: Request, res: Response) => {
       email,
       password, // Password should be hashed in the model pre-save hook
       isAdmin,
+      avatarUrl
     });
 
     await newUser.save();
@@ -49,7 +50,7 @@ export const registerUser = async (req: Request, res: Response) => {
       name: newUser.name,
       email: newUser.email,
       isAdmin: newUser.isAdmin,
-      avatarUrl: avatarUrl || "",
+      avatarUrl: newUser.avatarUrl || "",
       createdAt: newUser.createdAt,
       updatedAt: newUser.updatedAt,
     };

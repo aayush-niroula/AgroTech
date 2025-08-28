@@ -15,6 +15,7 @@ import ProductDetailPage from './Pages/ProductDetailsPage'
 import ChatPage from './Pages/ChatPage'
 import Inbox from './components/Inbox'
 import { ProfileSettings } from './Pages/ProfileSetting'
+import AdminDashboard from './components/AdminDashboard'
 
 
 const App = () => {
@@ -37,6 +38,7 @@ const App = () => {
       <Route path="/register" element={<Register />} />
       <Route path="/login" element={<Login />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path='/admin' element={<AdminDashboard/>}/>
     </Routes>
   
   )
